@@ -53,22 +53,22 @@ public partial class SceneParams {
     public bool Ndc { get; set; }
 
     [JsonProperty("0_weights")]
-    public double[][] The0_Weights { get; set; }
+    public double[][] _0Weights { get; set; }
 
     [JsonProperty("1_weights")]
-    public double[][] The1_Weights { get; set; }
+    public double[][] _1Weights { get; set; }
 
     [JsonProperty("2_weights")]
-    public double[][] The2_Weights { get; set; }
+    public double[][] _2Weights { get; set; }
 
     [JsonProperty("0_bias")]
-    public double[] The0_Bias { get; set; }
+    public double[] _0Bias { get; set; }
 
     [JsonProperty("1_bias")]
-    public double[] The1_Bias { get; set; }
+    public double[] _1Bias { get; set; }
 
     [JsonProperty("2_bias")]
-    public double[] The2_Bias { get; set; }
+    public double[] _2Bias { get; set; }
 
     [JsonProperty("format")]
     public string Format { get; set; }

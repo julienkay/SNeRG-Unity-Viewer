@@ -3,7 +3,6 @@ using Newtonsoft.Json;
 using UnityEngine.Networking;
 using System;
 using System.Threading.Tasks;
-using System.Text;
 
 public static class WebRequestAsyncUtility {
 

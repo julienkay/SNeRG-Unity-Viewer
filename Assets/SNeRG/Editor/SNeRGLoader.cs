@@ -2,6 +2,7 @@ using Newtonsoft.Json;
 using System;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Unity.Collections;
 using UnityEditor;
@@ -10,10 +11,12 @@ using static WebRequestAsyncUtility;
 
 public class SNeRGLoader {
 
-    private static readonly string DownloadTitle = "Downloading Assets";
-    private static readonly string DownloadInfo = "Downloading Assets for ";
+    private static readonly string LoadingTitle = "Loading Assets";
+    private static readonly string ProcessingTitle = "Processing Assets";
+    private static readonly string DownloadInfo = "Loading Assets for ";
+    private static readonly string AssemblyInfo = "Assembling 3D Volume Textures for ";
     private static readonly string DownloadAllTitle = "Downloading All Assets";
-    private static readonly string DownloadAllMessage = "You are about to download all the demo scenes from the SNeRG paper!\nDownloading/Processing might take a few minutes and take ~3.3GB of disk space.\n\nClick 'OK', if you wish to continue.";
+    private static readonly string DownloadAllMessage = "You are about to download all the demo scenes from the SNeRG paper!\nDownloading/Processing might take a few minutes and quite a bit of RAM & disk space.\n\nClick 'OK', if you wish to continue.";
     
     [MenuItem("SNeRG/Asset Downloads/-- Synthetic Rendered Scenes --", false, -1)]
     public static void Separator0() { }
@@ -95,7 +98,7 @@ public class SNeRGLoader {
         await ImportAssetsAsync(scene);
     }
 
-    private const string BASE_URL_SYNTH = "https://storage.googleapis.com/snerg/750/lego/";
+    private const string BASE_URL_SYNTH = "https://storage.googleapis.com/snerg/750/";
     private const string BASE_URL_REAL = "https://storage.googleapis.com/snerg/real_1000/";
 
     private const string BASE_FOLDER = "Assets/SNeRG Data/";
@@ -127,7 +130,7 @@ public class SNeRGLoader {
         return $"{GetBaseUrl(scene)}/rgba_{i:D3}.png";
     }
     private static string GetFeatureVolumeUrl(SNeRGScene scene, int i) {
-        return $"{GetBaseUrl(scene)}/feature{i:D3}.png";
+        return $"{GetBaseUrl(scene)}/feature_{i:D3}.png";
     }
 
     private static string GetSceneParamsAssetPath(SNeRGScene scene) {
@@ -135,6 +138,47 @@ public class SNeRGLoader {
         Directory.CreateDirectory(Path.GetDirectoryName(path));
         return path;
     }
+    private static string GetRGBTextureAssetPath(SNeRGScene scene) {
+        string path = $"{GetBasePath(scene)}/Textures/{scene.String()} RGB Volume Texture.asset";
+        Directory.CreateDirectory(Path.GetDirectoryName(path));
+        return path;
+    }
+    private static string GetAlphaTextureAssetPath(SNeRGScene scene) {
+        string path = $"{GetBasePath(scene)}/Textures/{scene.String()} Alpha Volume Texture.asset";
+        Directory.CreateDirectory(Path.GetDirectoryName(path));
+        return path;
+    }
+    private static string GetFeatureTextureAssetPath(SNeRGScene scene) {
+        string path = $"{GetBasePath(scene)}/Textures/{scene.String()} Feature Volume Texture.asset";
+        Directory.CreateDirectory(Path.GetDirectoryName(path));
+        return path;
+    }
+    private static string GetAtlasTextureAssetPath(SNeRGScene scene) {
+        string path = $"{GetBasePath(scene)}/Textures/{scene.String()} Atlas Index Texture.asset";
+        Directory.CreateDirectory(Path.GetDirectoryName(path));
+        return path;
+    }
+    private static string GetShaderAssetPath(SNeRGScene scene) {
+        string path = $"{GetBasePath(scene)}/Shaders/RayMarchShader_{scene}.shader";
+        Directory.CreateDirectory(Path.GetDirectoryName(path));
+        return path;
+    }
+    private static string GetMaterialAssetPath(SNeRGScene scene) {
+        string path = $"{GetBasePath(scene)}/Materials/Material_{scene}.mat";
+        Directory.CreateDirectory(Path.GetDirectoryName(path));
+        return path;
+    }
+    private static string GetWeightsAssetPath(SNeRGScene scene, int i) {
+        string path = $"{GetBasePath(scene)}/SceneParams/weightsTex{i}.asset";
+        Directory.CreateDirectory(Path.GetDirectoryName(path));
+        return path;
+    }
+    /*private static string GetMaterialAssetPath(SNeRGScene scene) {
+        string path = $"{GetBasePath(scene)}/OBJs/Materials/shape{i}_{j}-defaultMat.mat";
+        Directory.CreateDirectory(Path.GetDirectoryName(path));
+        return path;
+    }*/
+
     private static string GetAtlasIndexCachePath(SNeRGScene scene) {
         string path = $"{GetCacheLocation(scene)}/atlas_indices.png";
         Directory.CreateDirectory(Path.GetDirectoryName(path));
@@ -146,55 +190,56 @@ public class SNeRGLoader {
         return path;
     }
     private static string GetFeatureVolumeCachePath(SNeRGScene scene, int i) {
-        string path = $"{GetCacheLocation(scene)}/feature{i:D3}.png";
+        string path = $"{GetCacheLocation(scene)}/feature_{i:D3}.png";
         Directory.CreateDirectory(Path.GetDirectoryName(path));
         return path;
     }
 
     //public TextAsset SceneParamsAsset;
 
-    public Texture2D[] _rgbaArray;
+    /*public Texture2D[] _rgbaArray;
     public Texture2D[] _featureArray;
-    public Texture2D _atlasIndexImage;
+    public Texture2D _atlasIndexImage;*/
 
-    [SerializeField]
+    //[SerializeField]
     //public SceneParams SceneParams;
 
-    [SerializeField]
+    /*[SerializeField]
     private Texture3D rgbVolumeTexture;
     [SerializeField]
     private Texture3D alphaVolumeTexture;
     [SerializeField]
     private Texture3D featureVolumeTexture;
     [SerializeField]
-    private Texture3D atlasIndexTexture;
+    private Texture3D atlasIndexTexture;*/
 
     /*private int volume_width { get { return (int)SceneParams.AtlasWidth; } }
     private int volume_height { get { return (int)SceneParams.AtlasWidth; } }
     private int volume_depth { get { return (int)SceneParams.AtlasDepth; } }*/
 
     private static async Task ImportAssetsAsync(SNeRGScene scene) {
-        string objName = scene.ToString().ToLower();
+        string objName = scene.String();
 
-        EditorUtility.DisplayProgressBar(DownloadTitle, $"{DownloadInfo}'{objName}'...", 0.1f);
+        EditorUtility.DisplayProgressBar(LoadingTitle, $"{DownloadInfo}'{objName}'...", 0.1f);
         var sceneParams = await DownloadSceneParamsAsync(scene);
-        EditorUtility.DisplayProgressBar(DownloadTitle, $"{DownloadInfo}'{objName}'...", 0.2f);
+        EditorUtility.DisplayProgressBar(LoadingTitle, $"{DownloadInfo}'{objName}'...", 0.2f);
 
         // downloads 3D slices to temp directory
         var atlasTask = DownloadAtlasIndexDataAsync(scene);
         var rgbVolumeTask = DownloadRGBVolumeDataAsync(scene, sceneParams);
         var featureVolumeTask = DownloadFeatureVolumeDataAsync(scene, sceneParams);
 
-        Task.WaitAll(atlasTask, rgbVolumeTask, featureVolumeTask);
+        //Task.WaitAll(atlasTask, rgbVolumeTask, featureVolumeTask);
 
-        byte[] atlasIndexData = await atlasTask;
+        Texture2D atlasIndexData = await atlasTask;
         Texture2D[] rgbImages = await rgbVolumeTask;
         Texture2D[] featureImages = await featureVolumeTask;
 
-        EditorUtility.DisplayProgressBar(DownloadTitle, $"{DownloadInfo}'{objName}'...", 0.4f);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"{AssemblyInfo}'{objName}'...", 0.3f);
 
-        Initialize(atlasIndexData, rgbImages, featureImages, sceneParams);
+        Initialize(scene, atlasIndexData, rgbImages, featureImages, sceneParams);
 
+        EditorUtility.ClearProgressBar();
     }
 
     private static async Task<SceneParams> DownloadSceneParamsAsync(SNeRGScene scene) {
@@ -207,7 +252,7 @@ public class SNeRGLoader {
         return sceneParams;
     }
 
-    private static async Task<byte[]> DownloadAtlasIndexDataAsync(SNeRGScene scene) {
+    private static async Task<Texture2D> DownloadAtlasIndexDataAsync(SNeRGScene scene) {
         string path = GetAtlasIndexCachePath(scene);
         byte[] atlasIndexData;
 
@@ -217,10 +262,15 @@ public class SNeRGLoader {
         } else {
             string url = GetAtlasIndexUrl(scene);
             atlasIndexData = await WebRequestBinaryAsync.SendWebRequestAsync(url);
-            File.WriteAllBytes(GetAtlasIndexCachePath(scene), atlasIndexData);
+            File.WriteAllBytes(path, atlasIndexData);
         }
 
-        return atlasIndexData;
+        Texture2D atlasIndexImage = new Texture2D(2, 2, TextureFormat.RGB24, mipChain: false, linear: true);
+        atlasIndexImage.filterMode = FilterMode.Point;
+        atlasIndexImage.wrapMode = TextureWrapMode.Clamp;
+        atlasIndexImage.LoadImage(atlasIndexData);
+
+        return atlasIndexImage;
     }
 
     private static async Task<Texture2D[]> DownloadRGBVolumeDataAsync(SNeRGScene scene, SceneParams sceneParams) {
@@ -235,12 +285,14 @@ public class SNeRGLoader {
             } else {
                 string url = GetRGBVolumeUrl(scene, i);
                 rgbVolumeData = await WebRequestBinaryAsync.SendWebRequestAsync(url);
+                Debug.Log("rgb " + i);
                 File.WriteAllBytes(path, rgbVolumeData);
             }
 
             Texture2D rgbVolumeImage = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: false, linear: true);
             rgbVolumeImage.filterMode = FilterMode.Point;
             rgbVolumeImage.wrapMode = TextureWrapMode.Clamp;
+            rgbVolumeImage.alphaIsTransparency = true;
             rgbVolumeImage.LoadImage(rgbVolumeData);
             rgbVolumeArray[i] = rgbVolumeImage;
         }
@@ -261,6 +313,7 @@ public class SNeRGLoader {
             } else {
                 string url = GetFeatureVolumeUrl(scene, i);
                 featureVolumeData = await WebRequestBinaryAsync.SendWebRequestAsync(url);
+                Debug.Log("feature " + i);
                 File.WriteAllBytes(path, featureVolumeData);
             }
 
@@ -274,47 +327,114 @@ public class SNeRGLoader {
         return featureVolumeArray;
     }
 
-    private static void Initialize(byte[] atlasIndexData, Texture2D[] rgbaData, Texture2D[] featureData, SceneParams sceneParams) {
-        int width   =   (int)Mathf.Ceil(sceneParams.GridWidth / (float)sceneParams.BlockSize);
-        int height  =   (int)Mathf.Ceil(sceneParams.GridHeight / (float)sceneParams.BlockSize);
-        int depth   =   (int)Mathf.Ceil(sceneParams.GridDepth / (float)sceneParams.BlockSize);
+    private static void Initialize(SNeRGScene scene, Texture2D atlasIndexImage, Texture2D[] rgbaData, Texture2D[] featureData, SceneParams sceneParams) {
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Raymarch Shader...", 0.3f);
+        CreateRayMarchShader(scene, sceneParams);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Material...", 0.4f);
+        CreateMaterial(scene, sceneParams);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' RGB Volume Texture...", 0.5f);
+        CreateRgbVolumeTexture(scene, rgbaData, sceneParams);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Feature Volume Texture...", 0.6f);
+        CreateFeatureVolumeTexture(scene, featureData, sceneParams);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Atlas Index Texture...", 0.7f);
+        CreateAtlasIndexTexture(scene, atlasIndexImage, sceneParams);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Weight Textures...", 0.8f);
+        CreateWeightTextures(scene, sceneParams);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Finishing '{scene}' assets..", 0.8f);
+        VerifyMaterial(scene, sceneParams);
+    }
 
+    private static void CreateRgbVolumeTexture(SNeRGScene scene, Texture2D[] rgbaData, SceneParams sceneParams) {
+        string rgbAssetPath = GetRGBTextureAssetPath(scene);
+        string alphaAssetPath = GetAlphaTextureAssetPath(scene);
+        
+        // already exists
+        if (File.Exists(rgbAssetPath) && File.Exists(alphaAssetPath)) {
+            return;
+        }
+
+        // initialize 3D textures
         Texture3D rgbVolumeTexture = new Texture3D(sceneParams.AtlasWidth, sceneParams.AtlasHeight, sceneParams.AtlasDepth, TextureFormat.RGB24, mipChain: false) {
             filterMode = FilterMode.Bilinear,
             wrapMode = TextureWrapMode.Clamp,
-            name = "RGB Volume Texture"
+            name = Path.GetFileNameWithoutExtension(rgbAssetPath)
         };
 
         Texture3D alphaVolumeTexture = new Texture3D(sceneParams.AtlasWidth, sceneParams.AtlasHeight, sceneParams.AtlasDepth, TextureFormat.R8, mipChain: true) {
             filterMode = FilterMode.Trilinear,   // original code uses different min mag filters, which Unity doesn't let us do, tbd
             wrapMode = TextureWrapMode.Clamp,
-            name = "Alpha Volume Texture"
+            name = Path.GetFileNameWithoutExtension(alphaAssetPath)
         };
 
+        // load data into 3D textures
+        loadSplitVolumeTexture(rgbaData, alphaVolumeTexture, rgbVolumeTexture, sceneParams);
+
+        AssetDatabase.CreateAsset(rgbVolumeTexture, rgbAssetPath);
+        AssetDatabase.CreateAsset(alphaVolumeTexture, alphaAssetPath);
+
+        string materialAssetPath = GetMaterialAssetPath(scene);
+        Material material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
+        material.SetTexture("mapColor", rgbVolumeTexture);
+        material.SetTexture("mapAlpha", alphaVolumeTexture);
+        AssetDatabase.SaveAssets();
+    }
+
+    private static void CreateFeatureVolumeTexture(SNeRGScene scene, Texture2D[] featureData, SceneParams sceneParams) {
+        string featureAssetPath = GetFeatureTextureAssetPath(scene);
+
+        // already exists
+        if (File.Exists(featureAssetPath)) {
+            return;
+        }
+
+        // initialize 3D texture
         Texture3D featureVolumeTexture = new Texture3D(sceneParams.AtlasWidth, sceneParams.AtlasHeight, sceneParams.AtlasDepth, TextureFormat.RGBA32, mipChain: false) {
             filterMode = FilterMode.Bilinear,
             wrapMode = TextureWrapMode.Clamp,
-            name = "Feature Volume Texture",
+            name = Path.GetFileNameWithoutExtension(featureAssetPath)
         };
 
-        Texture3D atlasIndexTexture = new Texture3D(width, height, depth, TextureFormat.RGB24, mipChain: false) {
-            filterMode = FilterMode.Bilinear,
+        // load data into 3D textures
+        LoadVolumeTexture(featureData, featureVolumeTexture, sceneParams);
+
+        AssetDatabase.CreateAsset(featureVolumeTexture, featureAssetPath);
+
+        string materialAssetPath = GetMaterialAssetPath(scene);
+        Material material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
+        material.SetTexture("mapFeatures", featureVolumeTexture);
+        AssetDatabase.SaveAssets();
+    }
+
+    private static void CreateAtlasIndexTexture(SNeRGScene scene, Texture2D atlasIndexImage, SceneParams sceneParams) {
+        int width = (int)Mathf.Ceil(sceneParams.GridWidth / (float)sceneParams.BlockSize);
+        int height = (int)Mathf.Ceil(sceneParams.GridHeight / (float)sceneParams.BlockSize);
+        int depth = (int)Mathf.Ceil(sceneParams.GridDepth / (float)sceneParams.BlockSize);
+
+        string atlasAssetPath = GetAtlasTextureAssetPath(scene);
+
+        // already exists
+        if (File.Exists(atlasAssetPath)) {
+            return;
+        }
+
+        // initialize 3D texture
+        Texture3D atlasIndexTexture = new Texture3D(width, height, depth, TextureFormat.RGBA32, mipChain: false) {
+            filterMode = FilterMode.Point,
             wrapMode = TextureWrapMode.Clamp,
-            name = "Atlas Index Texture"
+            name = Path.GetFileNameWithoutExtension(atlasAssetPath),
         };
-        atlasIndexTexture.SetPixelData(atlasIndexData, 0);
+
+        // load data into 3D textures
+        NativeArray<byte> rawAtlasIndexData = atlasIndexImage.GetRawTextureData<byte>();
+        atlasIndexTexture.SetPixelData(rawAtlasIndexData, 0);
         atlasIndexTexture.Apply();
 
-        loadSplitVolumeTexture(rgbaData, alphaVolumeTexture, rgbVolumeTexture, sceneParams);
-        loadVolumeTexturePNG(sceneParams);
-        createRayMarchMaterial(sceneParams);
+        AssetDatabase.CreateAsset(atlasIndexTexture, atlasAssetPath);
 
-        /*
-        UnityEditor.AssetDatabase.CreateAsset(rgbVolumeTexture      , "Assets/" + rgbVolumeTexture.name     + ".asset");
-        UnityEditor.AssetDatabase.CreateAsset(alphaVolumeTexture    , "Assets/" + alphaVolumeTexture.name   + ".asset");
-        UnityEditor.AssetDatabase.CreateAsset(featureVolumeTexture  , "Assets/" + featureVolumeTexture.name + ".asset");
-        UnityEditor.AssetDatabase.CreateAsset(atlasIndexTexture     , "Assets/" + atlasIndexTexture.name    + ".asset");
-        */
+        string materialAssetPath = GetMaterialAssetPath(scene);
+        Material material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
+        material.SetTexture("mapIndex", atlasIndexTexture);
+        AssetDatabase.SaveAssets();
     }
 
     /// Lego Scene Params:
@@ -452,19 +572,23 @@ public class SNeRGLoader {
     /// <summary>
     /// Fills an existing 3D RGBA texture from {url}_%03d.png.
     /// </summary>
-    private static void loadVolumeTexturePNG(SceneParams sceneParams) {
-        Debug.Assert(sceneParams.NumSlices == _featureArray.Length, "Expected " + sceneParams.NumSlices + " feature slices, but found " + _featureArray.Length);
+    private static void LoadVolumeTexture(Texture2D[] featureArray, Texture3D featureVolumeTexture, SceneParams sceneParams) {
+        Debug.Assert(sceneParams.NumSlices == featureArray.Length, "Expected " + sceneParams.NumSlices + " feature slices, but found " + featureArray.Length);
 
-        int slice_depth = 4;    // slices packed into one atlassed texture
-        long num_slices = sceneParams.NumSlices;
-        int numPixels = volume_width * volume_height * slice_depth;    // pixels per atlassed feature texture
+        int volume_width  = sceneParams.AtlasWidth;
+        int volume_height = sceneParams.AtlasWidth;
+        int volume_depth  = sceneParams.AtlasDepth;
+
+        int slice_depth   = 4;    // slices packed into one atlassed texture
+        long num_slices   = sceneParams.NumSlices;
+        int numPixels     = volume_width * volume_height * slice_depth;    // pixels per atlassed feature texture
 
         NativeArray<Color32> featurePixels = featureVolumeTexture.GetPixelData<Color32>(0);
         Debug.Assert(featurePixels.Length == num_slices * numPixels, "Mismatching RGB Texture Data. Expected: " + num_slices * numPixels + ". Actual: + " + featurePixels.Length);
 
         for (int i = 0; i < num_slices; i++) {
 
-            NativeArray<Color32> _featureSlice = _featureArray[i].GetRawTextureData<Color32>();
+            NativeArray<Color32> _featureSlice = featureArray[i].GetRawTextureData<Color32>();
             Debug.Assert(_featureSlice.Length == numPixels, "Mismatching feature Texture Data. Expected: " + numPixels + ". Actual: + " + _featureSlice.Length);
 
             NativeSlice<Color32> dst = new NativeSlice<Color32>(featurePixels, i * numPixels, numPixels);
@@ -476,39 +600,31 @@ public class SNeRGLoader {
         featureVolumeTexture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
     }
 
-    private static void createRayMarchMaterial() {
+    private static void CreateRayMarchShader(SNeRGScene scene, SceneParams sceneParams) {
         Vector3 minPosition = new Vector3(
-            (float)SceneParams.MinX,
-            (float)SceneParams.MinY,
-            (float)SceneParams.MinZ
+            (float)sceneParams.MinX,
+            (float)sceneParams.MinY,
+            (float)sceneParams.MinZ
         );
-        long        gridWidth       = SceneParams.GridWidth;
-        long        gridHeight      = SceneParams.GridWidth;
-        long        gridDepth       = SceneParams.GridDepth;
-        long        blockSize       = SceneParams.BlockSize;
-        double      voxelSize       = SceneParams.VoxelSize;
-        long        atlasWidth      = SceneParams.AtlasWidth;
-        long        atlasHeight     = SceneParams.AtlasHeight;
-        long        atlasDepth      = SceneParams.AtlasDepth;
+        long        gridWidth      = sceneParams.GridWidth;
+        long        gridHeight     = sceneParams.GridWidth;
+        long        gridDepth      = sceneParams.GridDepth;
+        long        blockSize      = sceneParams.BlockSize;
+        double      voxelSize      = sceneParams.VoxelSize;
+        long        atlasWidth     = sceneParams.AtlasWidth;
+        long        atlasHeight    = sceneParams.AtlasHeight;
+        long        atlasDepth     = sceneParams.AtlasDepth;
 
-        double[][]  Weights_0       = SceneParams.The0_Weights;
-        double[][]  Weights_1       = SceneParams.The1_Weights;
-        double[][]  Weights_2       = SceneParams.The2_Weights;
-        double[]    Bias_0          = SceneParams.The0_Bias;
-        double[]    Bias_1          = SceneParams.The1_Bias;
-        double[]    Bias_2          = SceneParams.The2_Bias;
+        double[][]  Weights_0      = sceneParams._0Weights;
+        double[][]  Weights_1      = sceneParams._1Weights;
+        double[][]  Weights_2      = sceneParams._2Weights;
+        double[]    Bias_0         = sceneParams._0Bias;
+        double[]    Bias_1         = sceneParams._1Bias;
+        double[]    Bias_2         = sceneParams._2Bias;
 
-        // First set up the network weights.
-
-        Texture2D   weightsTexZero  = createFloatTextureFromData(Weights_0);
-        Texture2D   weightsTexOne   = createFloatTextureFromData(Weights_1);
-        Texture2D   weightsTexTwo   = createFloatTextureFromData(Weights_2);
-
-        StringBuilder biasListZero  = toBiasList(Bias_0);
-        StringBuilder biasListOne   = toBiasList(Bias_1);
-        StringBuilder biasListTwo   = toBiasList(Bias_2);
-
-        Debug.Log(biasListZero.Length + " " + biasListZero.Capacity);
+        StringBuilder biasListZero = toBiasList(Bias_0);
+        StringBuilder biasListOne  = toBiasList(Bias_1);
+        StringBuilder biasListTwo  = toBiasList(Bias_2);
 
         int channelsZero            = Weights_0 .Length;
         int channelsOne             = Bias_0    .Length;
@@ -517,27 +633,28 @@ public class SNeRGLoader {
         int posEncScales            = 4;
 
         string shaderSource = RaymarchShader.Template;
-        /*
-        string fragmentShaderSource = rayMarchFragmentShader.replace(
-            new RegExp('NUM_CHANNELS_ZERO', 'g'), channelsZero);
-        fragmentShaderSource = fragmentShaderSource.replace(
-            new RegExp('NUM_POSENC_SCALES', 'g'), posEncScales.toString());
-        fragmentShaderSource = fragmentShaderSource.replace(
-            new RegExp('NUM_CHANNELS_ONE', 'g'), channelsOne);
-        fragmentShaderSource = fragmentShaderSource.replace(
-            new RegExp('NUM_CHANNELS_TWO', 'g'), channelsTwo);
-        fragmentShaderSource = fragmentShaderSource.replace(
-            new RegExp('NUM_CHANNELS_THREE', 'g'), channelsThree);
+        shaderSource = new Regex("OBJECT_NAME"       ).Replace(shaderSource, $"{scene}");
+        shaderSource = new Regex("NUM_CHANNELS_ZERO" ).Replace(shaderSource, $"{channelsZero}");
+        shaderSource = new Regex("NUM_POSENC_SCALES" ).Replace(shaderSource, $"{posEncScales}");
+        shaderSource = new Regex("NUM_CHANNELS_ONE"  ).Replace(shaderSource, $"{channelsOne}");
+        shaderSource = new Regex("NUM_CHANNELS_TWO"  ).Replace(shaderSource, $"{channelsTwo}");
+        shaderSource = new Regex("NUM_CHANNELS_THREE").Replace(shaderSource, $"{channelsThree}");
+        shaderSource = new Regex("BIAS_LIST_ZERO"    ).Replace(shaderSource, $"{biasListZero}");
+        shaderSource = new Regex("BIAS_LIST_ONE"     ).Replace(shaderSource, $"{biasListOne}");
+        shaderSource = new Regex("BIAS_LIST_TWO"     ).Replace(shaderSource, $"{biasListTwo}");
 
-        fragmentShaderSource = fragmentShaderSource.replace(
-            new RegExp('BIAS_LIST_ZERO', 'g'), biasListZero);
-        fragmentShaderSource = fragmentShaderSource.replace(
-            new RegExp('BIAS_LIST_ONE', 'g'), biasListOne);
-        fragmentShaderSource = fragmentShaderSource.replace(
-          new RegExp('BIAS_LIST_TWO', 'g'), biasListTwo);
+        // tbd: whats the right approach here? original formula int(ceil(length(gridSize))) seems to
+        // produce values too high for unrolling loops (e.g. 1300)
+        //shaderSource = new Regex("MAX_STEP").Replace(shaderSource, "20");
+
+        string shaderAssetPath = GetShaderAssetPath(scene);
+        File.WriteAllText(shaderAssetPath, shaderSource);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+
 
         // Now pass all the 3D textures as uniforms to the shader.
-        let worldspace_R_opengl = new THREE.Matrix3();
+        /*let worldspace_R_opengl = new THREE.Matrix3();
         let M_dict = network_weights['worldspace_T_opengl'];
         worldspace_R_opengl['set'](
             M_dict[0][0], M_dict[0][1], M_dict[0][2],
@@ -580,31 +697,124 @@ public class SNeRGLoader {
         return material;*/
     }
 
+    private static void CreateMaterial(SNeRGScene scene, SceneParams sceneParams) {
+        string materialAssetPath = GetMaterialAssetPath(scene);
+        Material material;
+
+        if (File.Exists(GetMaterialAssetPath(scene))) {
+            material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
+        } else {
+            string shaderAssetPath = GetShaderAssetPath(scene);
+            Shader raymarchShader = AssetDatabase.LoadAssetAtPath<Shader>(shaderAssetPath);
+            material = new Material(raymarchShader);
+        }
+
+        Texture2D weightsTexZero  = AssetDatabase.LoadAssetAtPath<Texture2D>(GetWeightsAssetPath(scene, 0));
+        Texture2D weightsTexOne   = AssetDatabase.LoadAssetAtPath<Texture2D>(GetWeightsAssetPath(scene, 1));
+        Texture2D weightsTexTwo   = AssetDatabase.LoadAssetAtPath<Texture2D>(GetWeightsAssetPath(scene, 2));
+        material.SetTexture("weightsZero", weightsTexZero);
+        material.SetTexture("weightsOne", weightsTexOne);
+        material.SetTexture("weightsTwo", weightsTexTwo);
+
+        material.SetVector("minPosition", new Vector4(
+            (float)sceneParams.MinX,
+            (float)sceneParams.MinY,
+            (float)sceneParams.MinZ,
+            0f)
+        );
+        material.SetVector("gridSize", new Vector4(
+            sceneParams.GridWidth,
+            sceneParams.GridHeight,
+            sceneParams.GridDepth,
+            0)
+        );
+        material.SetVector("atlasSize", new Vector4(
+            sceneParams.AtlasWidth,
+            sceneParams.AtlasHeight,
+            sceneParams.AtlasDepth,
+            0)
+        );
+        material.SetFloat("voxelSize", (float)sceneParams.VoxelSize);
+        material.SetFloat("blockSize", (float)sceneParams.BlockSize);
+        material.SetFloat("maxStep", 20f);
+
+        // volume texture properties will be assigned when creating the 3D textures to avoid having to load them into memory here
+
+        if (!File.Exists(GetMaterialAssetPath(scene))) {
+            AssetDatabase.CreateAsset(material, materialAssetPath);
+        }
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+    }
+
     /// <summary>
-    /// Creates a float32 texture from an array of floats.
+    /// Assign volume textures again in case material got recreated.
+    /// </summary>
+    private static void VerifyMaterial(SNeRGScene scene, SceneParams sceneParams) {
+        string materialAssetPath = GetMaterialAssetPath(scene);
+        Material material        = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
+                                 
+        string rgbAssetPath      = GetRGBTextureAssetPath(scene);
+        string alphaAssetPath    = GetAlphaTextureAssetPath(scene);
+        string featureAssetPath  = GetFeatureTextureAssetPath(scene);
+        string atlasAssetPath    = GetAtlasTextureAssetPath(scene);
+        
+        if (material.GetTexture("mapColor") == null) {
+            Texture3D rgb = AssetDatabase.LoadAssetAtPath<Texture3D>(rgbAssetPath);
+            material.SetTexture("mapColor", rgb);
+        }
+        if (material.GetTexture("mapAlpha") == null) {
+            Texture3D alpha = AssetDatabase.LoadAssetAtPath<Texture3D>(alphaAssetPath);
+            material.SetTexture("mapAlpha", alpha);
+        }
+        if (material.GetTexture("mapFeatures") == null) {
+            Texture3D feature = AssetDatabase.LoadAssetAtPath<Texture3D>(featureAssetPath);
+            material.SetTexture("mapFeatures", feature);
+        }
+        if (material.GetTexture("mapIndex") == null) {
+            Texture3D atlas = AssetDatabase.LoadAssetAtPath<Texture3D>(atlasAssetPath);
+            material.SetTexture("mapIndex", atlas);
+        }
+    }
+
+    private static void CreateWeightTextures(SNeRGScene scene, SceneParams sceneParams) {
+        Texture2D weightsTexZero = createFloatTextureFromData(sceneParams._0Weights);
+        Texture2D weightsTexOne = createFloatTextureFromData(sceneParams._1Weights);
+        Texture2D weightsTexTwo = createFloatTextureFromData(sceneParams._2Weights);
+        AssetDatabase.CreateAsset(weightsTexZero, GetWeightsAssetPath(scene, 0));
+        AssetDatabase.CreateAsset(weightsTexOne, GetWeightsAssetPath(scene, 1));
+        AssetDatabase.CreateAsset(weightsTexTwo, GetWeightsAssetPath(scene, 2));
+        AssetDatabase.SaveAssets();
+    }
+
+    /// <summary>
+    /// Creates a float32 texture from an 2D array of weights.
     /// </summary>
     private static Texture2D createFloatTextureFromData(double[][] weights) {
         int width = weights.Length;
         int height = weights[0].Length;
-        float[] weightsData = toFloatArray(width, height, weights);
 
-        Texture2D texture = new Texture2D(width, height, TextureFormat.RFloat, mipChain: false);
-        texture.filterMode = FilterMode.Bilinear;
+        Texture2D texture = new Texture2D(width, height, TextureFormat.RFloat, mipChain: false, linear: true);
+        texture.filterMode = FilterMode.Point;
         texture.wrapMode = TextureWrapMode.Clamp;
+        NativeArray<float> textureData = texture.GetRawTextureData<float>();
+        FillTexture(textureData, weights);
+        texture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
+
         return texture;
     }
 
-    private static float[] toFloatArray(int width, int height, double[][] data) {
+    private static void FillTexture(NativeArray<float> textureData, double[][] data) {
+        int width = data.Length;
+        int height = data[0].Length;
 
-        float[] result = new float[width * height];
         for (int co = 0; co < height; co++) {
             for (int ci = 0; ci < width; ci++) {
                 int index = co * width + ci;
                 double weight = data[ci][co];
-                result[index] = (float)weight;
+                textureData[index] = (float)weight;
             }
         }
-        return result;
     }
 
     private static StringBuilder toBiasList(double[] biases) {
@@ -637,7 +847,7 @@ public enum SNeRGScene {
     ToyCar
 }
 
-public static class MNeRFSceneExtensions {
+public static class SNeRGSceneExtensions {
 
     public static string String(this SNeRGScene scene) {
         return scene.ToString().ToLower();
