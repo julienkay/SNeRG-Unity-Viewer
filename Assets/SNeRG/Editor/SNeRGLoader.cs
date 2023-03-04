@@ -292,7 +292,8 @@ public class SNeRGLoader {
                 File.WriteAllBytes(path, rgbVolumeData);
             }
 
-            Texture2D rgbVolumeImage = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: false, linear: true);
+            // Unity's LoadImage() always loads this as ARGB32, no matter the format specified here
+            Texture2D rgbVolumeImage = new Texture2D(2, 2, TextureFormat.ARGB32, mipChain: false, linear: true);
             rgbVolumeImage.filterMode = FilterMode.Point;
             rgbVolumeImage.wrapMode = TextureWrapMode.Clamp;
             rgbVolumeImage.alphaIsTransparency = true;
@@ -481,92 +482,19 @@ public class SNeRGLoader {
         Debug.Assert(alphaPixels.Length == num_slices * numBytes    , "Mismatching alpha Texture Data. Expected: " + num_slices * numBytes     + ". Actual: + " + alphaPixels.Length);
 
         for (int i = 0; i < num_slices; i++) {
-
+            // _rgbaSlice is in ARGB format!
             NativeArray<byte> _rgbaSlice = rgbaArray[i].GetRawTextureData<byte>();
             Debug.Assert(_rgbaSlice.Length == numBytes * 4, "Mismatching RGBA Texture Data. Expected: " + numBytes * 4 + ". Actual: + " + _rgbaSlice.Length);
 
             int baseIndexRGB = i * numBytes * 3;
             int baseIndexAlpha = i * numBytes;
             for (int j = 0; j < numBytes; j++) {
-                rgbPixels   [baseIndexRGB   + (j * 3)    ] = _rgbaSlice[j * 4    ];
-                rgbPixels   [baseIndexRGB   + (j * 3) + 1] = _rgbaSlice[j * 4 + 1];
-                rgbPixels   [baseIndexRGB   + (j * 3) + 2] = _rgbaSlice[j * 4 + 2];
-                alphaPixels [baseIndexAlpha +  j         ] = _rgbaSlice[j * 4 + 3];
+                rgbPixels   [baseIndexRGB   + (j * 3)    ] = _rgbaSlice[j * 4 + 1];
+                rgbPixels   [baseIndexRGB   + (j * 3) + 1] = _rgbaSlice[j * 4 + 2];
+                rgbPixels   [baseIndexRGB   + (j * 3) + 2] = _rgbaSlice[j * 4 + 3];
+                alphaPixels [baseIndexAlpha +  j         ] = _rgbaSlice[j * 4    ];
             }
-
-            /// gl.texSubImage3D(
-            /// gl.TEXTURE_3D,          // target
-            /// 0,                      // level (0 -> no mip maps)
-            /// 0,                      // x offset
-            /// y,                      // y offset
-            /// z + i * slice_depth,    // z offset
-            /// volume_width,           // width
-            /// 1,                      // height
-            /// 1,                      // depth
-            /// gl.RGB,                 // format
-            /// gl.UNSIGNED_BYTE,       // type
-            /// rgbPixels,              // source data
-            /// 3 * volume_width * (y + volume_height * z)  // optional source byte offset
-            /// );
-
-
-            /*re
-            
-            let rgbaPixels = values[0]; // lenhgth: 67,108,864
-            let i = values[1];
-
-            let rgbPixels = new Uint8Array(
-                volume_width * volume_height * slice_depth * 3);
-            let alphaPixels = new Uint8Array(
-                volume_width * volume_height * slice_depth * 1);
-
-            for (let j = 0; j < volume_width * volume_height * slice_depth;
-                 j++) {
-                rgbPixels[j * 3 + 0] = rgbaPixels[j * 4 + 0];
-                rgbPixels[j * 3 + 1] = rgbaPixels[j * 4 + 1];
-                rgbPixels[j * 3 + 2] = rgbaPixels[j * 4 + 2];
-                alphaPixels[j] = rgbaPixels[j * 4 + 3];
-            }
-
-            // We unfortunately have to touch THREE.js internals to get access
-            // to the texture handle and gl.texSubImage3D. Using dictionary
-            // notation to make this code robust to minifcation.
-            const rgbTextureProperties =
-                gRenderer['properties'].get(texture_rgb);
-            const alphaTextureProperties =
-                gRenderer['properties'].get(texture_alpha);
-            let gl = gRenderer.getContext();
-
-            let oldTexture = gl.getParameter(gl.TEXTURE_BINDING_3D);
-            gl.bindTexture(
-                gl.TEXTURE_3D, rgbTextureProperties['__webglTexture']);
-            // Upload row-by-row to work around bug with Intel + Mac OSX.
-            for (let z = 0; z < slice_depth; ++z) {
-                for (let y = 0; y < volume_height; ++y) {
-                    gl.texSubImage3D(
-                        gl.TEXTURE_3D, 0, 0, y, z + i * slice_depth,
-                        volume_width, 1, 1, gl.RGB, gl.UNSIGNED_BYTE,
-                        rgbPixels, 3 * volume_width * (y + volume_height * z));
-                }
-            }
-
-            gl.bindTexture(
-                gl.TEXTURE_3D, alphaTextureProperties['__webglTexture']);
-            // Upload row-by-row to work around bug with Intel + Mac OSX.
-            for (let z = 0; z < slice_depth; ++z) {
-                for (let y = 0; y < volume_height; ++y) {
-                    gl.texSubImage3D(
-                        gl.TEXTURE_3D, 0, 0, y, z + i * slice_depth,
-                        volume_width, 1, 1, gl.RED, gl.UNSIGNED_BYTE,
-                        alphaPixels, volume_width * (y + volume_height * z));
-                }
-            }
-            gl.bindTexture(gl.TEXTURE_3D, oldTexture);*/
-
         }
-
-        //rgbVolumeTexture  .SetPixelData(rgbVolumeData,    0);
-        //alphaVolumeTexture.SetPixelData(alphaVolumeData,  0);
 
         rgbVolumeTexture  .Apply(updateMipmaps: false, makeNoLongerReadable: true);
         alphaVolumeTexture.Apply(updateMipmaps: true , makeNoLongerReadable: true);
@@ -647,57 +575,13 @@ public class SNeRGLoader {
         shaderSource = new Regex("BIAS_LIST_TWO"     ).Replace(shaderSource, $"{biasListTwo}");
 
         // tbd: whats the right approach here? original formula int(ceil(length(gridSize))) seems to
-        // produce values too high for unrolling loops (e.g. 1300)
-        //shaderSource = new Regex("MAX_STEP").Replace(shaderSource, "20");
+        // produces pretty high value by default (e.g. 1300)
+        shaderSource = new Regex("MAX_STEP").Replace(shaderSource, "20");
 
         string shaderAssetPath = GetShaderAssetPath(scene);
         File.WriteAllText(shaderAssetPath, shaderSource);
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-
-
-        // Now pass all the 3D textures as uniforms to the shader.
-        /*let worldspace_R_opengl = new THREE.Matrix3();
-        let M_dict = network_weights['worldspace_T_opengl'];
-        worldspace_R_opengl['set'](
-            M_dict[0][0], M_dict[0][1], M_dict[0][2],
-            M_dict[1][0], M_dict[1][1], M_dict[1][2],
-            M_dict[2][0], M_dict[2][1], M_dict[2][2]);
-        */
-
-        /*const material = new THREE.ShaderMaterial({
-        uniforms: {
-                'mapAlpha': { 'value': alphaVolumeTexture},
-          'mapColor': { 'value': rgbVolumeTexture},
-          'mapFeatures': { 'value': featureVolumeTexture},
-          'mapIndex': { 'value': atlasIndexTexture},
-          'displayMode': { 'value': gDisplayMode - 0},
-          'ndc' : { 'value' : 0},
-          'nearPlane' : { 'value' : 0.33},
-          'blockSize': { 'value': blockSize},
-          'voxelSize': { 'value': voxelSize},
-          'minPosition': { 'value': minPosition},
-          'weightsZero': { 'value': weightsTexZero},
-          'weightsOne': { 'value': weightsTexOne},
-          'weightsTwo': { 'value': weightsTexTwo},
-          'world_T_clip': { 'value': new THREE.Matrix4()},
-          'worldspace_R_opengl': { 'value': worldspace_R_opengl},
-          'gridSize':
-              { 'value': new THREE.Vector3(gridWidth, gridHeight, gridDepth)},
-          'atlasSize':
-              { 'value': new THREE.Vector3(atlasWidth, atlasHeight, atlasDepth)}
-            },
-        vertexShader:
-            rayMarchVertexShader,
-        fragmentShader:
-            fragmentShaderSource,
-        vertexColors:
-            true,
-      });*/
-
-        /*material.side = THREE.DoubleSide;
-        material.depthTest = false;
-        return material;*/
     }
 
     private static void CreateMaterial(SNeRGScene scene, SceneParams sceneParams) {
