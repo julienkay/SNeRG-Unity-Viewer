@@ -321,7 +321,8 @@ public class SNeRGLoader {
                 File.WriteAllBytes(path, featureVolumeData);
             }
 
-            Texture2D featureVolumeImage = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: false, linear: true);
+            // Unity's LoadImage() always loads this as ARGB32, no matter the format specified here
+            Texture2D featureVolumeImage = new Texture2D(2, 2, TextureFormat.ARGB32, mipChain: false, linear: true);
             featureVolumeImage.filterMode = FilterMode.Point;
             featureVolumeImage.wrapMode = TextureWrapMode.Clamp;
             featureVolumeImage.LoadImage(featureVolumeData);
@@ -392,7 +393,7 @@ public class SNeRGLoader {
         }
 
         // initialize 3D texture
-        Texture3D featureVolumeTexture = new Texture3D(sceneParams.AtlasWidth, sceneParams.AtlasHeight, sceneParams.AtlasDepth, TextureFormat.RGBA32, mipChain: false) {
+        Texture3D featureVolumeTexture = new Texture3D(sceneParams.AtlasWidth, sceneParams.AtlasHeight, sceneParams.AtlasDepth, TextureFormat.ARGB32, mipChain: false) {
             filterMode = FilterMode.Bilinear,
             wrapMode = TextureWrapMode.Clamp,
             name = Path.GetFileNameWithoutExtension(featureAssetPath)
@@ -473,7 +474,6 @@ public class SNeRGLoader {
         int slice_depth = 4;    // slices packed into one atlassed texture
         int num_slices = sceneParams.NumSlices;
         int numBytes = volume_width * volume_height * slice_depth;    // bytes per atlassed texture
-        Debug.Log("num bytes " + numBytes); //numBytes = 16,777,216 = 2,048 x 2,048 x 4
 
         NativeArray<byte> rgbPixels     = rgbVolumeTexture  .GetPixelData<byte>(0);
         NativeArray<byte> alphaPixels   = alphaVolumeTexture.GetPixelData<byte>(0);
