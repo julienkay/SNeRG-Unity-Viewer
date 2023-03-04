@@ -265,7 +265,10 @@ public class SNeRGLoader {
             File.WriteAllBytes(path, atlasIndexData);
         }
 
-        Texture2D atlasIndexImage = new Texture2D(2, 2, TextureFormat.RGB24, mipChain: false, linear: true);
+        // !!! Unity's LoadImage() does NOT respect the texture format specified in the input texture!
+        // It always loads this as ARGB32, no matter the format specified here.
+        // Ideally we'd directly load an RGB24 texture.
+        Texture2D atlasIndexImage = new Texture2D(2, 2, TextureFormat.ARGB32, mipChain: false, linear: true);
         atlasIndexImage.filterMode = FilterMode.Point;
         atlasIndexImage.wrapMode = TextureWrapMode.Clamp;
         atlasIndexImage.LoadImage(atlasIndexData);
@@ -418,7 +421,7 @@ public class SNeRGLoader {
         }
 
         // initialize 3D texture
-        Texture3D atlasIndexTexture = new Texture3D(width, height, depth, TextureFormat.RGBA32, mipChain: false) {
+        Texture3D atlasIndexTexture = new Texture3D(width, height, depth, TextureFormat.ARGB32, mipChain: false) {
             filterMode = FilterMode.Point,
             wrapMode = TextureWrapMode.Clamp,
             name = Path.GetFileNameWithoutExtension(atlasAssetPath),
