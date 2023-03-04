@@ -719,6 +719,9 @@ public class SNeRGLoader {
         material.SetTexture("weightsOne", weightsTexOne);
         material.SetTexture("weightsTwo", weightsTexTwo);
 
+        material.SetInteger("displayMode", 0);
+        material.SetInteger("ndc", sceneParams.Ndc ? 1 : 0);
+
         material.SetVector("minPosition", new Vector4(
             (float)sceneParams.MinX,
             (float)sceneParams.MinY,

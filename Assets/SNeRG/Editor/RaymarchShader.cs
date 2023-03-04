@@ -1,30 +1,6 @@
 public static class RaymarchShader {
-    public const string Template = @"// This shader was ported by https://github.com/julienkay/
-// from example code found at https://phog.github.io/snerg/
-// 
-// @article{ hedman2021snerg,
-//     title = {Baking Neural Radiance Fields for Real - Time View Synthesis},
-//     author = {Peter Hedman and Pratul P.Srinivasan and Ben Mildenhall and Jonathan T.Barron and Paul Debevec},
-//     journal = {arXiv},
-//     year = {2021}
-// }
-//
-// Copyright 2021 The Google Research Authors.
-//
-// Licensed under the Apache License, Version 2.0 (the ""License"");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an ""AS IS"" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-Shader ""SNeRG/RayMarchShader_OBJECT_NAME"" {
+    public const string Template = @"Shader ""SNeRG/RayMarchShader_OBJECT_NAME"" {
     Properties {
-        _MainTex (""Texture"", 2D) = ""white"" {}
         mapAlpha(""Alpha Map"", 3D) = """" {}
         mapColor(""Color Map"", 3D) = """" {}
         mapFeatures(""Feature Map"", 3D) = """" {}
@@ -33,6 +9,9 @@ Shader ""SNeRG/RayMarchShader_OBJECT_NAME"" {
         weightsZero (""Weights Zero"", 2D) = ""white"" {}
         weightsOne (""Weights One"", 2D) = ""white"" {}
         weightsTwo (""Weights Two"", 2D) = ""white"" {}
+
+        displayMode(""Display Mode"", Integer) = 0
+        ndc(""NDC"", Integer) = 0
 
 	    minPosition (""Min Position"", Vector) = (0, 0, 0, 0)
         gridSize (""Grid Size"", Vector) = (0, 0, 0, 0)
@@ -43,7 +22,7 @@ Shader ""SNeRG/RayMarchShader_OBJECT_NAME"" {
         maxStep (""Max Step"", Float) = 0.0
     }
     SubShader {
-        Cull Front
+        Cull Back
         ZWrite Off
         ZTest Always
 
@@ -55,45 +34,8 @@ Shader ""SNeRG/RayMarchShader_OBJECT_NAME"" {
 
             #include ""UnityCG.cginc""
 
-            struct appdata {
-                float4 vertex : POSITION;
-                float2 uv : TEXCOORD0;
-            };
-
-            struct v2f {
-                float2 uv : TEXCOORD0;
-                float4 vertex : SV_POSITION;
-                float3 origin : TEXCOORD1;
-                float3 direction : TEXCOORD2;
-            };
-
-            v2f vert (appdata v) {
-                v2f o;
-                o.vertex = UnityObjectToClipPos(v.vertex);
-                o.uv = v.uv;
-
-                float4 screenPos = ComputeScreenPos(o.vertex);
-                o.origin = screenPos.xyz / screenPos.w;
-                o.direction = -WorldSpaceViewDir(v.vertex);
-                /*uniform float4x4 world_T_clip;
-
-                float4 positionClip = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                gl_Position = positionClip;
-
-                positionClip /= positionClip.w;
-                float4 nearPoint = world_T_clip * vec4(positionClip.x, positionClip.y, -1.0, 1.0);
-                float4 farPoint = world_T_clip * vec4(positionClip.x, positionClip.y, 1.0, 1.0);
-
-                o.vOrigin = nearPoint.xyz / nearPoint.w;
-                o.vDirection = normalize(farPoint.xyz / farPoint.w - vOrigin);*/
-
-                return o;
-            }
-
-            sampler2D _MainTex;
-
             int displayMode;
-            //int ndc;
+            int ndc;
 
             float4 minPosition;
             float4 gridSize;
@@ -111,6 +53,34 @@ Shader ""SNeRG/RayMarchShader_OBJECT_NAME"" {
             UNITY_DECLARE_TEX2D(weightsZero);
             UNITY_DECLARE_TEX2D(weightsOne);
             UNITY_DECLARE_TEX2D(weightsTwo);
+
+            struct appdata {
+                float4 vertex : POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
+            struct v2f {
+                float2 uv : TEXCOORD0;
+                float4 vertex : SV_POSITION;
+                float3 origin : TEXCOORD1;
+                float3 direction : TEXCOORD2;
+            };
+
+            v2f vert (appdata v) {
+                v2f o;
+                o.vertex = UnityObjectToClipPos(v.vertex);
+
+                float4 positionClip = mul(UNITY_MATRIX_MVP, v.vertex);
+                positionClip /= positionClip.w;
+
+                float4 nearPoint = mul(unity_WorldToObject, float4(positionClip.xy, 0.0, 1.0));
+                float4 farPoint = mul(unity_WorldToObject, float4(positionClip.xy, 1.0, 1.0));
+
+                o.origin = nearPoint.xyz;
+                o.direction = normalize(farPoint.xyz - nearPoint.xyz);
+
+                return o;
+            }
 
             half indexToPosEnc (half3 dir, int index) {
                 half coordinate =
@@ -185,7 +155,7 @@ Shader ""SNeRG/RayMarchShader_OBJECT_NAME"" {
                 return half3(result[0], result[1], result[2]);
             }
 
-            /*half3 convertOriginToNDC(float3 origin, float3 direction) {
+            half3 convertOriginToNDC(float3 origin, float3 direction) {
                 // We store the NDC scenes flipped, so flip back.
                 origin.z *= -1.0;
                 direction.z *= -1.0;
@@ -232,7 +202,7 @@ Shader ""SNeRG/RayMarchShader_OBJECT_NAME"" {
                 direction = normalize(float3(d0, d1, d2));
                 direction.z *= -1.0;
                 return direction;
-            }*/
+            }
 
             // Compute the atlas block index for a point in the scene using pancake
             // 3D atlas packing.
@@ -264,16 +234,28 @@ Shader ""SNeRG/RayMarchShader_OBJECT_NAME"" {
             }
 
             fixed4 frag (v2f i) : SV_Target {
+                // Runs the full model with view dependence.
+                const int DISPLAY_NORMAL = 0;
+                // Disables the view-dependence network.
+                const int DISPLAY_DIFFUSE = 1;
+                // Only shows the latent features.
+                const int DISPLAY_FEATURES = 2;
+                // Only shows the view dependent component.
+                const int DISPLAY_VIEW_DEPENDENT = 3;
+                // Only shows the coarse block grid.
+                const int DISPLAY_COARSE_GRID = 4;
+                // Only shows the 3D texture atlas.
+                const int DISPLAY_3D_ATLAS = 5;
 
                 // Set up the ray parameters in world space..
                 float nearWorld = _ProjectionParams.y;
                 half3 originWorld = i.origin;
                 half3 directionWorld = normalize(i.direction);
-                /*if (ndc != 0) {
+                if (ndc != 0) {
                     nearWorld = 0.0;
-                    originWorld = convertOriginToNDC(vOrigin, normalize(vDirection));
-                    directionWorld = convertDirectionToNDC(vOrigin, normalize(vDirection));
-                }*/
+                    originWorld = convertOriginToNDC(i.origin, normalize(i.direction));
+                    directionWorld = convertDirectionToNDC(i.origin, normalize(i.direction));
+                }
 
                 // Now transform them to the voxel grid coordinate system.
                 half3 originGrid = (originWorld - minPosition.xyz) / voxelSize;
@@ -301,18 +283,19 @@ Shader ""SNeRG/RayMarchShader_OBJECT_NAME"" {
                       blockMin, blockMax, originGrid, invDirectionGrid);
                 half3 atlasBlockIndex;
 
-                //if (displayMode == DISPLAY_3D_ATLAS) {
-                //  atlasBlockIndex = pancakeBlockIndex(posGrid, blockSize, iBlockGridBlocks);
-                //} else {
-                    atlasBlockIndex = 255.0 * UNITY_SAMPLE_TEX3D(mapIndex, (blockMin + blockMax) / (2.0 * blockGridSize)).xyz;
-                //}
+                if (displayMode == DISPLAY_3D_ATLAS) {
+                  atlasBlockIndex = pancakeBlockIndex(posGrid, blockSize, iBlockGridBlocks);
+                } else {
+                  atlasBlockIndex = 255.0 * UNITY_SAMPLE_TEX3D(mapIndex, (blockMin + blockMax) / (2.0 * blockGridSize)).xyz;
+                }
 
                 half visibility = 1.0;
                 half3 color = half3(0.0, 0.0, 0.0);
                 half4 features = half4(0.0, 0.0, 0.0, 0.0);
                 int step = 0;
 
-                while (step < 20 && t < tMinMax.y && visibility > 1.0 / 255.0) {
+                [loop]
+                while (step < maxStep && t < tMinMax.y && visibility > 1.0 / 255.0) {
                     // Skip empty macroblocks.
                     if (atlasBlockIndex.x > 254.0) {
                         t = 0.5 + tBlockMinMax.y;
@@ -321,14 +304,14 @@ Shader ""SNeRG/RayMarchShader_OBJECT_NAME"" {
                         posAtlas += atlasBlockIndex * (blockSize + 2.0);
                         posAtlas += 1.0; // Account for the one voxel padding in the atlas.
 
-                        /*if (displayMode == DISPLAY_COARSE_GRID) {
+                        if (displayMode == DISPLAY_COARSE_GRID) {
                             color = atlasBlockIndex * (blockSize + 2.0) / atlasSize.xyz;
                             features.rgb = atlasBlockIndex * (blockSize + 2.0) / atlasSize.xyz;
                             features.a = 1.0;
                             visibility = 0.0;
                             continue;
                         }
-                        */
+
                         // Do a conservative fetch for alpha!=0 at a lower resolution,
                         // and skip any voxels which are empty. First, this saves bandwidth
                         // since we only fetch one byte instead of 8 (trilinear) and most
@@ -351,10 +334,10 @@ Shader ""SNeRG/RayMarchShader_OBJECT_NAME"" {
                             if (atlasAlpha > 0.5 / 255.0) {
                             half4 atlasRgba = half4(0.0, 0.0, 0.0, atlasAlpha);
                             atlasRgba.rgb = UNITY_SAMPLE_TEX3D(mapColor, atlasUvw).rgb;
-                            //if (displayMode != DISPLAY_DIFFUSE) {
+                            if (displayMode != DISPLAY_DIFFUSE) {
                                 half4 atlasFeatures = UNITY_SAMPLE_TEX3D(mapFeatures, atlasUvw);
                                 features += visibility * atlasFeatures;
-                            //}
+                            }
                             color += visibility * atlasRgba.rgb;
                             visibility *= 1.0 - atlasRgba.a;
                             }
@@ -366,43 +349,40 @@ Shader ""SNeRG/RayMarchShader_OBJECT_NAME"" {
                     if (t > tBlockMinMax.y) {
                         blockMin = floor(posGrid / blockSize) * blockSize;
                         blockMax = blockMin + blockSize;
-                        tBlockMinMax = rayAabbIntersection(
-                                blockMin, blockMax, originGrid, invDirectionGrid);
+                        tBlockMinMax = rayAabbIntersection(blockMin, blockMax, originGrid, invDirectionGrid);
 
-                        //if (displayMode == DISPLAY_3D_ATLAS) {
-                        //    atlasBlockIndex = pancakeBlockIndex(
-                        //    posGrid, blockSize, iBlockGridBlocks);
-                        //} else {
+                        if (displayMode == DISPLAY_3D_ATLAS) {
+                            atlasBlockIndex = pancakeBlockIndex(posGrid, blockSize, iBlockGridBlocks);
+                        } else {
                             atlasBlockIndex = 255.0 * UNITY_SAMPLE_TEX3D(mapIndex, (blockMin + blockMax) / (2.0 * blockGridSize)).xyz;
-                        //}
+                        }
                     }
                     step++;
                 }
 
-                /*if (displayMode == DISPLAY_VIEW_DEPENDENT) {
-                  color = vec3(0.0, 0.0, 0.0) * visibility;
+                if (displayMode == DISPLAY_VIEW_DEPENDENT) {
+                  color = half3(0.0, 0.0, 0.0) * visibility;
                 } else if (displayMode == DISPLAY_FEATURES) {
                   color = features.rgb;
-                }*/
+                }
 
                 // For forward-facing scenes, we partially unpremultiply alpha to fill
                 // tiny holes in the rendering.
                 half alpha = 1.0 - visibility;
-                /*if (ndc != 0 && alpha > 0.0) {
+                if (ndc != 0 && alpha > 0.0) {
                     half filledAlpha = min(1.0, alpha * 1.5);
                     color *= filledAlpha / alpha;
                     alpha = filledAlpha;
                     visibility = 1.0 - filledAlpha;
-                }*/
+                }
 
                 // Compute the final color, to save compute only compute view-depdence
                 // for rays that intersected something in the scene.
                 color = half3(1.0, 1.0, 1.0) * visibility + color;
                 const float kVisibilityThreshold = 254.0 / 255.0;
-                if (visibility <= kVisibilityThreshold
-                    //&& (displayMode == DISPLAY_NORMAL
-                    //|| displayMode == DISPLAY_VIEW_DEPENDENT)
-                    ) {
+                if (visibility <= kVisibilityThreshold &&
+                    (displayMode == DISPLAY_NORMAL ||
+                     displayMode == DISPLAY_VIEW_DEPENDENT)) {
                   color += evaluateNetwork(color, features, mul(worldspace_R_opengl, normalize(i.direction)));
                 }
 
