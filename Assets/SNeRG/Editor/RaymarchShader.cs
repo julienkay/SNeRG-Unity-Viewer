@@ -42,7 +42,7 @@ public static class RaymarchShader {
             float4 atlasSize;
             float voxelSize;
             float blockSize;
-            float3x3 worldspace_R_opengl;
+            float4x4 worldspace_T_opengl;
             int maxStep;
 
             UNITY_DECLARE_TEX3D(mapAlpha);
@@ -383,7 +383,7 @@ public static class RaymarchShader {
                 if (visibility <= kVisibilityThreshold &&
                     (displayMode == DISPLAY_NORMAL ||
                      displayMode == DISPLAY_VIEW_DEPENDENT)) {
-                  color += evaluateNetwork(color, features, mul(worldspace_R_opengl, normalize(i.direction)));
+                  color += evaluateNetwork(color, features, mul(worldspace_T_opengl, normalize(i.direction)));
                 }
 
                 return fixed4(color, 1.0);

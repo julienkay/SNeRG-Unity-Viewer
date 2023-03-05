@@ -626,6 +626,19 @@ public class SNeRGLoader {
         );
         material.SetFloat("voxelSize", (float)sceneParams.VoxelSize);
         material.SetFloat("blockSize", (float)sceneParams.BlockSize);
+        float[][] m = sceneParams.WorldspaceTOpengl;
+        Matrix4x4 worldspaceTOpengl = new Matrix4x4 {
+            m00 = m[0][0],
+            m01 = m[0][1],
+            m02 = m[0][2],
+            m10 = m[1][0],
+            m11 = m[1][1],
+            m12 = m[1][2],
+            m20 = m[2][0],
+            m21 = m[2][1],
+            m22 = m[2][2]
+        };
+        material.SetMatrix("worldspace_T_opengl", worldspaceTOpengl);
         material.SetFloat("maxStep", 20f);
 
         // volume texture properties will be assigned when creating the 3D textures to avoid having to load them into memory here

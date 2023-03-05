@@ -47,7 +47,7 @@ public partial class SceneParams {
     public int AtlasBlocksZ { get; set; }
 
     [JsonProperty("worldspace_T_opengl")]
-    public long[][] WorldspaceTOpengl { get; set; }
+    public float[][] WorldspaceTOpengl { get; set; }
 
     [JsonProperty("ndc")]
     public bool Ndc { get; set; }
