@@ -14,10 +14,7 @@ public class SNeRGLoader {
     private static readonly string LoadingTitle = "Loading Assets";
     private static readonly string ProcessingTitle = "Processing Assets";
     private static readonly string DownloadInfo = "Loading Assets for ";
-    private static readonly string AssemblyInfo = "Assembling 3D Volume Textures for ";
-    private static readonly string DownloadAllTitle = "Downloading All Assets";
-    private static readonly string DownloadAllMessage = "You are about to download all the demo scenes from the SNeRG paper!\nDownloading/Processing might take a few minutes and quite a bit of RAM & disk space.\n\nClick 'OK', if you wish to continue.";
-    
+
     [MenuItem("SNeRG/Asset Downloads/-- Synthetic Rendered Scenes --", false, -1)]
     public static void Separator0() { }
     [MenuItem("SNeRG/Asset Downloads/-- Synthetic Rendered Scenes --", true, -1)]
@@ -29,17 +26,6 @@ public class SNeRGLoader {
     [MenuItem("SNeRG/Asset Downloads/-- Real Captured Scenes --", true, 49)]
     public static bool Separator1Validate() {
         return false;
-    }
-
-    [MenuItem("SNeRG/Asset Downloads/Download All", false, -20)]
-    public static async void DownloadAllAssets() {
-        if (!EditorUtility.DisplayDialog(DownloadAllTitle, DownloadAllMessage, "OK")) {
-            return;
-        }
-
-        foreach (var scene in (SNeRGScene[])Enum.GetValues(typeof(SNeRGScene))) {
-            await DownloadAssets(scene);
-        }
     }
 
 #pragma warning disable CS4014
@@ -94,9 +80,6 @@ public class SNeRGLoader {
     }
 
 #pragma warning restore CS4014
-    private static async Task DownloadAssets(SNeRGScene scene) {
-        await ImportAssetsAsync(scene);
-    }
 
     private const string BASE_URL_SYNTH = "https://storage.googleapis.com/snerg/750/";
     private const string BASE_URL_REAL = "https://storage.googleapis.com/snerg/real_1000/";
