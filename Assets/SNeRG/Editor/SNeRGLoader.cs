@@ -639,7 +639,8 @@ public class SNeRGLoader {
             m22 = m[2][2]
         };
         material.SetMatrix("worldspace_T_opengl", worldspaceTOpengl);
-        material.SetFloat("maxStep", 20f);
+        int maxStep = Mathf.CeilToInt(new Vector3(sceneParams.GridWidth, sceneParams.GridWidth, sceneParams.GridDepth).magnitude);
+        material.SetInteger("maxStep", maxStep);
 
         // volume texture properties will be assigned when creating the 3D textures to avoid having to load them into memory here
 

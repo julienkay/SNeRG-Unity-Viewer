@@ -19,7 +19,7 @@ public static class RaymarchShader {
 	    voxelSize (""Voxel Size"", Float) = 0.0
 	    blockSize (""Block Size"", Float) = 0.0
 
-        maxStep (""Max Step"", Float) = 0.0
+        maxStep (""Max Step"", Integer) = 0.0
     }
     SubShader {
         Cull Back
