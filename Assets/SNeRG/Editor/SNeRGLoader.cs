@@ -407,9 +407,20 @@ public class SNeRGLoader {
             name = Path.GetFileNameWithoutExtension(atlasAssetPath),
         };
 
-        // load data into 3D textures
-        NativeArray<byte> rawAtlasIndexData = atlasIndexImage.GetRawTextureData<byte>();
-        atlasIndexTexture.SetPixelData(rawAtlasIndexData, 0);
+        // load data into a 3D texture, flipping the y axis for each depth slice
+        NativeArray<Color32> flippedAtlasIndexData = atlasIndexTexture.GetPixelData<Color32>(0);
+        NativeArray<Color32> sourceAtlasIndexData = atlasIndexImage.GetRawTextureData<Color32>();
+        for (int z = 0; z < depth; z++) {
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    int flippedY = height - y - 1;
+                    int source = z * (width * height) + (flippedY * width) + x;
+                    int target = z * (width * height) + (y * width) + x;
+                    flippedAtlasIndexData[target] = sourceAtlasIndexData[source];
+                }
+            }
+        }
+        atlasIndexTexture.SetPixelData(flippedAtlasIndexData, 0);
         atlasIndexTexture.Apply();
 
         AssetDatabase.CreateAsset(atlasIndexTexture, atlasAssetPath);
@@ -420,28 +431,6 @@ public class SNeRGLoader {
         AssetDatabase.SaveAssets();
     }
 
-    /// Lego Scene Params:
-    /// "voxel_size": 0.0031999999999999997
-    /// "block_size": 30
-    /// "grid_width": 750
-    /// "grid_height": 750
-    /// "grid_depth": 750
-    /// "atlas_width": 2048
-    /// "atlas_height": 2048
-    /// "atlas_depth": 32
-    /// "num_slices": 8
-    /// "min_x": -1.2,
-    /// "min_y": -1.2,
-    /// "min_z": -1.2,
-    /// "atlas_blocks_x": 64,
-    /// "atlas_blocks_y": 64,
-    /// "atlas_blocks_z": 1,
-    /// "worldspace_T_opengl": [[-1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]],
-    /// "ndc": false,
-
-    /// <summary>
-    /// Fills an existing 3D RGB texture and an existing 3D alpha texture.
-    /// </summary>
     private static void loadSplitVolumeTexture(Texture2D[] rgbaArray, Texture3D alphaVolumeTexture, Texture3D rgbVolumeTexture, SceneParams sceneParams) {
         Debug.Assert(sceneParams.NumSlices == rgbaArray.Length, "Expected " + sceneParams.NumSlices + " RGBA slices, but found " + rgbaArray.Length);
 
@@ -474,15 +463,19 @@ public class SNeRGLoader {
             }
         }
 
-        rgbVolumeTexture  .Apply(updateMipmaps: false, makeNoLongerReadable: true);
-        alphaVolumeTexture.Apply(updateMipmaps: true , makeNoLongerReadable: true);
+        FlipY24(rgbVolumeTexture);
+        FlipY8(alphaVolumeTexture);
+
+        rgbVolumeTexture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
+        alphaVolumeTexture.Apply(updateMipmaps: true, makeNoLongerReadable: true);
+
     }
 
     /// <summary>
     /// Fills an existing 3D RGBA texture from {url}_%03d.png.
     /// </summary>
-    private static void LoadVolumeTexture(Texture2D[] featureArray, Texture3D featureVolumeTexture, SceneParams sceneParams) {
-        Debug.Assert(sceneParams.NumSlices == featureArray.Length, "Expected " + sceneParams.NumSlices + " feature slices, but found " + featureArray.Length);
+    private static void LoadVolumeTexture(Texture2D[] featureImages, Texture3D featureVolumeTexture, SceneParams sceneParams) {
+        Debug.Assert(sceneParams.NumSlices == featureImages.Length, "Expected " + sceneParams.NumSlices + " feature slices, but found " + featureImages.Length);
 
         int volume_width  = sceneParams.AtlasWidth;
         int volume_height = sceneParams.AtlasWidth;
@@ -497,7 +490,7 @@ public class SNeRGLoader {
 
         for (int i = 0; i < num_slices; i++) {
 
-            NativeArray<Color32> _featureSlice = featureArray[i].GetRawTextureData<Color32>();
+            NativeArray<Color32> _featureSlice = featureImages[i].GetRawTextureData<Color32>();
             Debug.Assert(_featureSlice.Length == numPixels, "Mismatching feature Texture Data. Expected: " + numPixels + ". Actual: + " + _featureSlice.Length);
 
             NativeSlice<Color32> dst = new NativeSlice<Color32>(featurePixels, i * numPixels, numPixels);
@@ -505,8 +498,65 @@ public class SNeRGLoader {
 
             dst.CopyFrom(src);
         }
-
+        FlipY(featureVolumeTexture);
         featureVolumeTexture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
+    }
+
+    /// <summary>
+    /// Vertically flips each depth slice in the given 32-bit 3D texture.
+    /// </summary>
+    private static void FlipY(Texture3D texture) {
+        int width = texture.width;
+        int height = texture.height;
+        int depth = texture.depth;
+        NativeArray<Color32> data = texture.GetPixelData<Color32>(0);
+        for (int z = 0; z < depth; z++) {
+            for (int y = 0; y < ((height + 1) / 2); y++) {
+                for (int x = 0; x < width; x++) {
+                    int flippedY = height - y - 1;
+                    int source = z * (width * height) + (flippedY * width) + x;
+                    int target = z * (width * height) + (y * width) + x;
+                    (data[target], data[source]) = (data[source], data[target]);
+                }
+            }
+        }
+    }
+    private struct Color24 {
+        public byte r;
+        public byte g;
+        public byte b;
+    }
+    private static void FlipY24(Texture3D texture) {
+        int width = texture.width;
+        int height = texture.height;
+        int depth = texture.depth;
+        NativeArray<Color24> data = texture.GetPixelData<Color24>(0);
+        for (int z = 0; z < depth; z++) {
+            for (int y = 0; y < ((height + 1) / 2); y++) {
+                for (int x = 0; x < width; x++) {
+                    int flippedY = height - y - 1;
+                    int source = z * (width * height) + (flippedY * width) + x;
+                    int target = z * (width * height) + (y * width) + x;
+                    (data[target], data[source]) = (data[source], data[target]);
+                }
+            }
+        }
+    }
+    private static void FlipY8(Texture3D texture) {
+        int width = texture.width;
+        int height = texture.height;
+        int depth = texture.depth;
+        NativeArray<byte> data = texture.GetPixelData<byte>(0);
+        for (int z = 0; z < depth; z++) {
+            for (int y = 0; y < ((height + 1) / 2); y++) {
+                for (int x = 0; x < width; x++) {
+                    int flippedY = height - y - 1;
+                    int source = z * (width * height) + (flippedY * width) + x;
+                    int target = z * (width * height) + (y * width) + x;
+                    (data[target], data[source]) = (data[source], data[target]);
+                }
+            }
+        }
     }
 
     private static void CreateRayMarchShader(SNeRGScene scene, SceneParams sceneParams) {
