@@ -22,7 +22,7 @@ public static class RaymarchShader {
         maxStep (""Max Step"", Integer) = 0.0
     }
     SubShader {
-        Cull Back
+        Cull Front
         ZWrite Off
         ZTest Always
 

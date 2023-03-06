@@ -156,11 +156,12 @@ public class SNeRGLoader {
         Directory.CreateDirectory(Path.GetDirectoryName(path));
         return path;
     }
-    /*private static string GetMaterialAssetPath(SNeRGScene scene) {
-        string path = $"{GetBasePath(scene)}/OBJs/Materials/shape{i}_{j}-defaultMat.mat";
+    private static string GetPrefabAssetPath(SNeRGScene scene) {
+        string path = $"{GetBasePath(scene)}/{scene}.prefab";
         Directory.CreateDirectory(Path.GetDirectoryName(path));
         return path;
-    }*/
+    }
+
 
     private static string GetAtlasIndexCachePath(SNeRGScene scene) {
         string path = $"{GetCacheLocation(scene)}/atlas_indices.png";
@@ -208,6 +209,8 @@ public class SNeRGLoader {
 
         EditorUtility.DisplayProgressBar(ProcessingTitle, $"Finishing '{scene}' assets..", 0.8f);
         VerifyMaterial(scene, sceneParams);
+
+        CreatePrefab(scene, sceneParams);
 
         EditorUtility.ClearProgressBar();
     }
@@ -539,20 +542,6 @@ public class SNeRGLoader {
     }
 
     private static void CreateRayMarchShader(SNeRGScene scene, SceneParams sceneParams) {
-        Vector3 minPosition = new Vector3(
-            (float)sceneParams.MinX,
-            (float)sceneParams.MinY,
-            (float)sceneParams.MinZ
-        );
-        long        gridWidth      = sceneParams.GridWidth;
-        long        gridHeight     = sceneParams.GridWidth;
-        long        gridDepth      = sceneParams.GridDepth;
-        long        blockSize      = sceneParams.BlockSize;
-        double      voxelSize      = sceneParams.VoxelSize;
-        long        atlasWidth     = sceneParams.AtlasWidth;
-        long        atlasHeight    = sceneParams.AtlasHeight;
-        long        atlasDepth     = sceneParams.AtlasDepth;
-
         double[][]  Weights_0      = sceneParams._0Weights;
         double[][]  Weights_1      = sceneParams._1Weights;
         double[][]  Weights_2      = sceneParams._2Weights;
@@ -738,6 +727,25 @@ public class SNeRGLoader {
             }
         }
         return biasList;
+    }
+
+    /// <summary>
+    /// Creates a convenient prefab for the SNeRG.
+    /// </summary>
+    private static void CreatePrefab(SNeRGScene scene, SceneParams sceneParams) {
+        GameObject prefabObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        prefabObject.transform.localScale = 2.0f * new Vector3(
+            Mathf.Abs((float)sceneParams.MinX),
+            Mathf.Abs((float)sceneParams.MinY),
+            Mathf.Abs((float)sceneParams.MinZ)
+        );
+        prefabObject.name = scene.ToString();
+        MeshRenderer renderer = prefabObject.GetComponent<MeshRenderer>();
+        string materialAssetPath = GetMaterialAssetPath(scene);
+        Material material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
+        renderer.material = material;
+        PrefabUtility.SaveAsPrefabAsset(prefabObject, GetPrefabAssetPath(scene));
+        GameObject.DestroyImmediate(prefabObject);
     }
 }
 
