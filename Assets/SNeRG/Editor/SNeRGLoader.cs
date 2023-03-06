@@ -183,22 +183,31 @@ public class SNeRGLoader {
 
         EditorUtility.DisplayProgressBar(LoadingTitle, $"{DownloadInfo}'{objName}'...", 0.1f);
         var sceneParams = await DownloadSceneParamsAsync(scene);
-        EditorUtility.DisplayProgressBar(LoadingTitle, $"{DownloadInfo}'{objName}'...", 0.2f);
 
-        // downloads 3D slices to temp directory
-        var atlasTask = DownloadAtlasIndexDataAsync(scene);
-        var rgbVolumeTask = DownloadRGBVolumeDataAsync(scene, sceneParams);
-        var featureVolumeTask = DownloadFeatureVolumeDataAsync(scene, sceneParams);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Raymarch Shader...", 0.2f);
+        CreateRayMarchShader(scene, sceneParams);
 
-        //Task.WaitAll(atlasTask, rgbVolumeTask, featureVolumeTask);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Material...", 0.3f);
+        CreateMaterial(scene, sceneParams);
 
-        Texture2D atlasIndexData = await atlasTask;
-        Texture2D[] rgbImages = await rgbVolumeTask;
-        Texture2D[] featureImages = await featureVolumeTask;
+        // load 3D slices from web or cacbe directory, then create 3D volume textures from that data
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Atlas Index Texture...", 0.4f);
+        Texture2D atlasIndexData = await LoadAtlasIndexDataAsync(scene);
+        CreateAtlasIndexTexture(scene, atlasIndexData, sceneParams);
 
-        EditorUtility.DisplayProgressBar(ProcessingTitle, $"{AssemblyInfo}'{objName}'...", 0.3f);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' RGB Volume Texture...", 0.5f);
+        Texture2D[] rgbImages = await LoadRGBVolumeDataAsync(scene, sceneParams);
+        CreateRgbVolumeTexture(scene, rgbImages, sceneParams);
 
-        Initialize(scene, atlasIndexData, rgbImages, featureImages, sceneParams);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Feature Volume Texture...", 0.6f);
+        Texture2D[] featureImages = await LoadFeatureVolumeDataAsync(scene, sceneParams);
+        CreateFeatureVolumeTexture(scene, featureImages, sceneParams);
+
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Weight Textures...", 0.7f);
+        CreateWeightTextures(scene, sceneParams);
+
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Finishing '{scene}' assets..", 0.8f);
+        VerifyMaterial(scene, sceneParams);
 
         EditorUtility.ClearProgressBar();
     }
@@ -213,7 +222,7 @@ public class SNeRGLoader {
         return sceneParams;
     }
 
-    private static async Task<Texture2D> DownloadAtlasIndexDataAsync(SNeRGScene scene) {
+    private static async Task<Texture2D> LoadAtlasIndexDataAsync(SNeRGScene scene) {
         string path = GetAtlasIndexCachePath(scene);
         byte[] atlasIndexData;
 
@@ -237,7 +246,7 @@ public class SNeRGLoader {
         return atlasIndexImage;
     }
 
-    private static async Task<Texture2D[]> DownloadRGBVolumeDataAsync(SNeRGScene scene, SceneParams sceneParams) {
+    private static async Task<Texture2D[]> LoadRGBVolumeDataAsync(SNeRGScene scene, SceneParams sceneParams) {
         Texture2D[] rgbVolumeArray = new Texture2D[sceneParams.NumSlices];
         for (int i = 0; i < sceneParams.NumSlices; i++) {
             string path = GetRGBVolumeCachePath(scene, i);
@@ -249,7 +258,6 @@ public class SNeRGLoader {
             } else {
                 string url = GetRGBVolumeUrl(scene, i);
                 rgbVolumeData = await WebRequestBinaryAsync.SendWebRequestAsync(url);
-                Debug.Log("rgb " + i);
                 File.WriteAllBytes(path, rgbVolumeData);
             }
 
@@ -265,7 +273,7 @@ public class SNeRGLoader {
         return rgbVolumeArray;
     }
 
-    private static async Task<Texture2D[]> DownloadFeatureVolumeDataAsync(SNeRGScene scene, SceneParams sceneParams) {
+    private static async Task<Texture2D[]> LoadFeatureVolumeDataAsync(SNeRGScene scene, SceneParams sceneParams) {
         Texture2D[] featureVolumeArray = new Texture2D[sceneParams.NumSlices];
 
         for (int i = 0; i < sceneParams.NumSlices; i++) {
@@ -278,7 +286,6 @@ public class SNeRGLoader {
             } else {
                 string url = GetFeatureVolumeUrl(scene, i);
                 featureVolumeData = await WebRequestBinaryAsync.SendWebRequestAsync(url);
-                Debug.Log("feature " + i);
                 File.WriteAllBytes(path, featureVolumeData);
             }
 
@@ -291,23 +298,6 @@ public class SNeRGLoader {
         }
 
         return featureVolumeArray;
-    }
-
-    private static void Initialize(SNeRGScene scene, Texture2D atlasIndexImage, Texture2D[] rgbaData, Texture2D[] featureData, SceneParams sceneParams) {
-        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Raymarch Shader...", 0.3f);
-        CreateRayMarchShader(scene, sceneParams);
-        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Material...", 0.4f);
-        CreateMaterial(scene, sceneParams);
-        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' RGB Volume Texture...", 0.5f);
-        CreateRgbVolumeTexture(scene, rgbaData, sceneParams);
-        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Feature Volume Texture...", 0.6f);
-        CreateFeatureVolumeTexture(scene, featureData, sceneParams);
-        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Atlas Index Texture...", 0.7f);
-        CreateAtlasIndexTexture(scene, atlasIndexImage, sceneParams);
-        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Weight Textures...", 0.8f);
-        CreateWeightTextures(scene, sceneParams);
-        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Finishing '{scene}' assets..", 0.8f);
-        VerifyMaterial(scene, sceneParams);
     }
 
     private static void CreateRgbVolumeTexture(SNeRGScene scene, Texture2D[] rgbaData, SceneParams sceneParams) {
@@ -335,6 +325,12 @@ public class SNeRGLoader {
         // load data into 3D textures
         loadSplitVolumeTexture(rgbaData, alphaVolumeTexture, rgbVolumeTexture, sceneParams);
 
+        // destroy intermediate textures to free memory
+        for (int i = rgbaData.Length - 1; i >= 0; i--) {
+            UnityEngine.Object.DestroyImmediate(rgbaData[i]);
+        }
+        Resources.UnloadUnusedAssets();
+
         AssetDatabase.CreateAsset(rgbVolumeTexture, rgbAssetPath);
         AssetDatabase.CreateAsset(alphaVolumeTexture, alphaAssetPath);
 
@@ -342,6 +338,7 @@ public class SNeRGLoader {
         Material material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
         material.SetTexture("mapColor", rgbVolumeTexture);
         material.SetTexture("mapAlpha", alphaVolumeTexture);
+
         AssetDatabase.SaveAssets();
     }
 
@@ -362,13 +359,18 @@ public class SNeRGLoader {
 
         // load data into 3D textures
         LoadVolumeTexture(featureData, featureVolumeTexture, sceneParams);
-
+        
+        // destroy intermediate textures to free memory
+        for (int i = featureData.Length - 1; i >= 0; i--) {
+            UnityEngine.Object.DestroyImmediate(featureData[i]);
+        }
+        Resources.UnloadUnusedAssets();
+    
         AssetDatabase.CreateAsset(featureVolumeTexture, featureAssetPath);
 
         string materialAssetPath = GetMaterialAssetPath(scene);
         Material material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
         material.SetTexture("mapFeatures", featureVolumeTexture);
-        AssetDatabase.SaveAssets();
     }
 
     private static void CreateAtlasIndexTexture(SNeRGScene scene, Texture2D atlasIndexImage, SceneParams sceneParams) {
@@ -406,12 +408,15 @@ public class SNeRGLoader {
         atlasIndexTexture.SetPixelData(flippedAtlasIndexData, 0);
         atlasIndexTexture.Apply();
 
+        // destroy intermediate texture to free memory
+        UnityEngine.Object.DestroyImmediate(atlasIndexImage);
+        Resources.UnloadUnusedAssets();
+
         AssetDatabase.CreateAsset(atlasIndexTexture, atlasAssetPath);
 
         string materialAssetPath = GetMaterialAssetPath(scene);
         Material material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
         material.SetTexture("mapIndex", atlasIndexTexture);
-        AssetDatabase.SaveAssets();
     }
 
     private static void loadSplitVolumeTexture(Texture2D[] rgbaArray, Texture3D alphaVolumeTexture, Texture3D rgbVolumeTexture, SceneParams sceneParams) {
@@ -607,13 +612,6 @@ public class SNeRGLoader {
             material = new Material(raymarchShader);
         }
 
-        Texture2D weightsTexZero  = AssetDatabase.LoadAssetAtPath<Texture2D>(GetWeightsAssetPath(scene, 0));
-        Texture2D weightsTexOne   = AssetDatabase.LoadAssetAtPath<Texture2D>(GetWeightsAssetPath(scene, 1));
-        Texture2D weightsTexTwo   = AssetDatabase.LoadAssetAtPath<Texture2D>(GetWeightsAssetPath(scene, 2));
-        material.SetTexture("weightsZero", weightsTexZero);
-        material.SetTexture("weightsOne", weightsTexOne);
-        material.SetTexture("weightsTwo", weightsTexTwo);
-
         material.SetInteger("displayMode", 0);
         material.SetInteger("ndc", sceneParams.Ndc ? 1 : 0);
 
@@ -698,7 +696,12 @@ public class SNeRGLoader {
         AssetDatabase.CreateAsset(weightsTexZero, GetWeightsAssetPath(scene, 0));
         AssetDatabase.CreateAsset(weightsTexOne, GetWeightsAssetPath(scene, 1));
         AssetDatabase.CreateAsset(weightsTexTwo, GetWeightsAssetPath(scene, 2));
-        AssetDatabase.SaveAssets();
+
+        string materialAssetPath = GetMaterialAssetPath(scene);
+        Material material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
+        material.SetTexture("weightsZero", weightsTexZero);
+        material.SetTexture("weightsOne", weightsTexOne);
+        material.SetTexture("weightsTwo", weightsTexTwo);
     }
 
     /// <summary>
