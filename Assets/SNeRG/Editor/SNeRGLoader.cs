@@ -195,28 +195,6 @@ public class SNeRGLoader {
         return path;
     }
 
-    //public TextAsset SceneParamsAsset;
-
-    /*public Texture2D[] _rgbaArray;
-    public Texture2D[] _featureArray;
-    public Texture2D _atlasIndexImage;*/
-
-    //[SerializeField]
-    //public SceneParams SceneParams;
-
-    /*[SerializeField]
-    private Texture3D rgbVolumeTexture;
-    [SerializeField]
-    private Texture3D alphaVolumeTexture;
-    [SerializeField]
-    private Texture3D featureVolumeTexture;
-    [SerializeField]
-    private Texture3D atlasIndexTexture;*/
-
-    /*private int volume_width { get { return (int)SceneParams.AtlasWidth; } }
-    private int volume_height { get { return (int)SceneParams.AtlasWidth; } }
-    private int volume_depth { get { return (int)SceneParams.AtlasDepth; } }*/
-
     private static async Task ImportAssetsAsync(SNeRGScene scene) {
         string objName = scene.String();
 
@@ -473,22 +451,22 @@ public class SNeRGLoader {
 
         int slice_depth = 4;    // slices packed into one atlassed texture
         int num_slices = sceneParams.NumSlices;
-        int numBytes = volume_width * volume_height * slice_depth;    // bytes per atlassed texture
+        int numPixels = volume_width * volume_height * slice_depth;    // pixels per atlassed texture
 
         NativeArray<byte> rgbPixels     = rgbVolumeTexture  .GetPixelData<byte>(0);
         NativeArray<byte> alphaPixels   = alphaVolumeTexture.GetPixelData<byte>(0);
 
-        Debug.Assert(rgbPixels  .Length == num_slices * numBytes * 3, "Mismatching RGB Texture Data. Expected: "   + num_slices * numBytes * 3 + ". Actual: + " + rgbPixels  .Length);
-        Debug.Assert(alphaPixels.Length == num_slices * numBytes    , "Mismatching alpha Texture Data. Expected: " + num_slices * numBytes     + ". Actual: + " + alphaPixels.Length);
+        Debug.Assert(rgbPixels  .Length == num_slices * numPixels * 3, "Mismatching RGB Texture Data. Expected: "   + num_slices * numPixels * 3 + ". Actual: + " + rgbPixels  .Length);
+        Debug.Assert(alphaPixels.Length == num_slices * numPixels    , "Mismatching alpha Texture Data. Expected: " + num_slices * numPixels     + ". Actual: + " + alphaPixels.Length);
 
         for (int i = 0; i < num_slices; i++) {
             // _rgbaSlice is in ARGB format!
-            NativeArray<byte> _rgbaSlice = rgbaArray[i].GetRawTextureData<byte>();
-            Debug.Assert(_rgbaSlice.Length == numBytes * 4, "Mismatching RGBA Texture Data. Expected: " + numBytes * 4 + ". Actual: + " + _rgbaSlice.Length);
+            NativeArray<byte> _rgbaSlice = rgbaArray[i].GetPixelData<byte>(0);
+            Debug.Assert(_rgbaSlice.Length == numPixels * 4, "Mismatching RGBA Texture Data. Expected: " + numPixels * 4 + ". Actual: + " + _rgbaSlice.Length);
 
-            int baseIndexRGB = i * numBytes * 3;
-            int baseIndexAlpha = i * numBytes;
-            for (int j = 0; j < numBytes; j++) {
+            int baseIndexRGB = i * numPixels * 3;
+            int baseIndexAlpha = i * numPixels;
+            for (int j = 0; j < numPixels; j++) {
                 rgbPixels   [baseIndexRGB   + (j * 3)    ] = _rgbaSlice[j * 4 + 1];
                 rgbPixels   [baseIndexRGB   + (j * 3) + 1] = _rgbaSlice[j * 4 + 2];
                 rgbPixels   [baseIndexRGB   + (j * 3) + 2] = _rgbaSlice[j * 4 + 3];
