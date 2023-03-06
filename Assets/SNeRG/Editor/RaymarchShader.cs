@@ -56,11 +56,9 @@ public static class RaymarchShader {
 
             struct appdata {
                 float4 vertex : POSITION;
-                float2 uv : TEXCOORD0;
             };
 
             struct v2f {
-                float2 uv : TEXCOORD0;
                 float4 vertex : SV_POSITION;
                 float3 origin : TEXCOORD1;
                 float3 direction : TEXCOORD2;
@@ -70,14 +68,8 @@ public static class RaymarchShader {
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
 
-                float4 positionClip = mul(UNITY_MATRIX_MVP, v.vertex);
-                positionClip /= positionClip.w;
-
-                float4 nearPoint = mul(unity_WorldToObject, float4(positionClip.xy, 0.0, 1.0));
-                float4 farPoint = mul(unity_WorldToObject, float4(positionClip.xy, 1.0, 1.0));
-
-                o.origin = nearPoint.xyz;
-                o.direction = normalize(farPoint.xyz - nearPoint.xyz);
+                o.origin = mul(unity_ObjectToWorld, v.vertex).xyz;
+                o.direction = -WorldSpaceViewDir(v.vertex);
 
                 return o;
             }
