@@ -392,20 +392,18 @@ public class SNeRGLoader {
             name = Path.GetFileNameWithoutExtension(atlasAssetPath),
         };
 
-        // load data into a 3D texture, flipping the y axis for each depth slice
-        NativeArray<Color32> flippedAtlasIndexData = atlasIndexTexture.GetPixelData<Color32>(0);
-        NativeArray<Color32> sourceAtlasIndexData = atlasIndexImage.GetRawTextureData<Color32>();
-        for (int z = 0; z < depth; z++) {
-            for (int y = 0; y < height; y++) {
-                for (int x = 0; x < width; x++) {
-                    int flippedY = height - y - 1;
-                    int source = z * (width * height) + (flippedY * width) + x;
-                    int target = z * (width * height) + (y * width) + x;
-                    flippedAtlasIndexData[target] = sourceAtlasIndexData[source];
-                }
-            }
-        }
-        atlasIndexTexture.SetPixelData(flippedAtlasIndexData, 0);
+        // load data into a 3D texture,
+
+        // load data into 3D textures
+        NativeArray<byte> rawAtlasIndexData = atlasIndexImage.GetRawTextureData<byte>();
+        atlasIndexTexture.SetPixelData(rawAtlasIndexData, 0);
+
+        // flip the y axis for each depth slice
+        FlipY<Color32>(atlasIndexTexture);
+
+        // reverse the slices of the 3D texture
+        //FlipZ<Color32>(atlasIndexTexture);
+
         atlasIndexTexture.Apply();
 
         // destroy intermediate texture to free memory
@@ -451,8 +449,10 @@ public class SNeRGLoader {
             }
         }
 
-        FlipY24(rgbVolumeTexture);
-        FlipY8(alphaVolumeTexture);
+        FlipY<Color24>(rgbVolumeTexture);
+        //FlipZ<Color24>(rgbVolumeTexture);
+        FlipY<byte>(alphaVolumeTexture);
+        //FlipZ<byte>(alphaVolumeTexture);
 
         rgbVolumeTexture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
         alphaVolumeTexture.Apply(updateMipmaps: true, makeNoLongerReadable: true);
@@ -486,18 +486,20 @@ public class SNeRGLoader {
 
             dst.CopyFrom(src);
         }
-        FlipY(featureVolumeTexture);
+        FlipY<Color32>(featureVolumeTexture);
+        //FlipZ<Color32>(featureVolumeTexture);
+
         featureVolumeTexture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
     }
 
     /// <summary>
-    /// Vertically flips each depth slice in the given 32-bit 3D texture.
+    /// Vertically flips each depth slice in the given 3D texture.
     /// </summary>
-    private static void FlipY(Texture3D texture) {
+    private static void FlipY<T>(Texture3D texture) where T : struct {
         int width = texture.width;
         int height = texture.height;
         int depth = texture.depth;
-        NativeArray<Color32> data = texture.GetPixelData<Color32>(0);
+        NativeArray<T> data = texture.GetPixelData<T>(0);
         for (int z = 0; z < depth; z++) {
             for (int y = 0; y < ((height + 1) / 2); y++) {
                 for (int x = 0; x < width; x++) {
@@ -509,42 +511,31 @@ public class SNeRGLoader {
             }
         }
     }
+
+    /// <summary>
+    /// Reverse the order of the depth slices of the 3D texture
+    /// </summary>
+    private static void FlipZ<T>(Texture3D texture) where T : struct {
+        int width = texture.width;
+        int height = texture.height;
+        int depth = texture.depth;
+        NativeArray<T> data = texture.GetPixelData<T>(0);
+        for (int z = 0; z < ((depth + 1) / 2); z++) {
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    int flippedZ = depth - z - 1;
+                    int source = flippedZ * (width * height) + (y * width) + x;
+                    int target = z * (width * height) + (y * width) + x;
+                    (data[target], data[source]) = (data[source], data[target]);
+                }
+            }
+        }
+    }
+
     private struct Color24 {
         public byte r;
         public byte g;
         public byte b;
-    }
-    private static void FlipY24(Texture3D texture) {
-        int width = texture.width;
-        int height = texture.height;
-        int depth = texture.depth;
-        NativeArray<Color24> data = texture.GetPixelData<Color24>(0);
-        for (int z = 0; z < depth; z++) {
-            for (int y = 0; y < ((height + 1) / 2); y++) {
-                for (int x = 0; x < width; x++) {
-                    int flippedY = height - y - 1;
-                    int source = z * (width * height) + (flippedY * width) + x;
-                    int target = z * (width * height) + (y * width) + x;
-                    (data[target], data[source]) = (data[source], data[target]);
-                }
-            }
-        }
-    }
-    private static void FlipY8(Texture3D texture) {
-        int width = texture.width;
-        int height = texture.height;
-        int depth = texture.depth;
-        NativeArray<byte> data = texture.GetPixelData<byte>(0);
-        for (int z = 0; z < depth; z++) {
-            for (int y = 0; y < ((height + 1) / 2); y++) {
-                for (int x = 0; x < width; x++) {
-                    int flippedY = height - y - 1;
-                    int source = z * (width * height) + (flippedY * width) + x;
-                    int target = z * (width * height) + (y * width) + x;
-                    (data[target], data[source]) = (data[source], data[target]);
-                }
-            }
-        }
     }
 
     private static void CreateRayMarchShader(SNeRGScene scene, SceneParams sceneParams) {

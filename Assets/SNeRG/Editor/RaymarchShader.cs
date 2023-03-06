@@ -68,7 +68,7 @@ public static class RaymarchShader {
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
 
-                o.origin = mul(unity_ObjectToWorld, v.vertex).xyz;
+                o.origin = _WorldSpaceCameraPos;
                 o.direction = -WorldSpaceViewDir(v.vertex);
 
                 return o;
@@ -293,6 +293,7 @@ public static class RaymarchShader {
                         t = 0.5 + tBlockMinMax.y;
                     } else { // Otherwise step through them and fetch RGBA and Features.
                         half3 posAtlas = clamp(posGrid - blockMin, 0.0, blockSize);
+                        posAtlas.z = blockSize - posAtlas.z; // TODO: randomly flipping z here helps, but need to figure out proper math
                         posAtlas += atlasBlockIndex * (blockSize + 2.0);
                         posAtlas += 1.0; // Account for the one voxel padding in the atlas.
 
