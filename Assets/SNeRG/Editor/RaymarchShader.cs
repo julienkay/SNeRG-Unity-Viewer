@@ -67,8 +67,11 @@ public static class RaymarchShader {
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
 
-                o.origin = _WorldSpaceCameraPos;
-                o.direction = -WorldSpaceViewDir(v.vertex);
+                o.origin = mul(unity_WorldToObject, float4(_WorldSpaceCameraPos, 1));
+                o.direction = mul(unity_WorldToObject, -WorldSpaceViewDir(v.vertex));
+
+                // assumes we're rendering on a unit cube
+                o.origin *= abs(minPosition) * 2;
 
                 return o;
             }
@@ -238,18 +241,18 @@ public static class RaymarchShader {
                 // Only shows the 3D texture atlas.
                 const int DISPLAY_3D_ATLAS = 5;
 
-                // Set up the ray parameters in world space..
-                float nearWorld = _ProjectionParams.y;
-                half3 originWorld = i.origin;
+                // Set up the ray parameters in object space..
+                float nearPlane = _ProjectionParams.y;
+                half3 origin = i.origin;
                 half3 directionWorld = normalize(i.direction);
                 if (ndc != 0) {
-                    nearWorld = 0.0;
-                    originWorld = convertOriginToNDC(i.origin, normalize(i.direction));
+                    nearPlane = 0.0;
+                    origin = convertOriginToNDC(i.origin, normalize(i.direction));
                     directionWorld = convertDirectionToNDC(i.origin, normalize(i.direction));
                 }
 
                 // Now transform them to the voxel grid coordinate system.
-                half3 originGrid = (originWorld - minPosition.xyz) / voxelSize;
+                half3 originGrid = (origin - minPosition.xyz) / voxelSize;
                 half3 directionGrid = directionWorld;
                 half3 invDirectionGrid = 1.0 / directionGrid;
 
@@ -265,7 +268,7 @@ public static class RaymarchShader {
                   return fixed4(1.0, 1.0, 1.0, 1.0);
                 }
 
-                float t = max(nearWorld / voxelSize, tMinMax.x) + 0.5;
+                float t = max(nearPlane / voxelSize, tMinMax.x) + 0.5;
                 half3 posGrid = originGrid + directionGrid * t;
 
                 half3 blockMin = floor(posGrid / blockSize) * blockSize;

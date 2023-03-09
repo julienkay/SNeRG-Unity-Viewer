@@ -739,11 +739,6 @@ public class SNeRGLoader {
     /// </summary>
     private static void CreatePrefab(SNeRGScene scene, SceneParams sceneParams) {
         GameObject prefabObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        prefabObject.transform.localScale = 2.0f * new Vector3(
-            Mathf.Abs((float)sceneParams.MinX),
-            Mathf.Abs((float)sceneParams.MinY),
-            Mathf.Abs((float)sceneParams.MinZ)
-        );
         prefabObject.name = scene.ToString();
         MeshRenderer renderer = prefabObject.GetComponent<MeshRenderer>();
         string materialAssetPath = GetMaterialAssetPath(scene);
