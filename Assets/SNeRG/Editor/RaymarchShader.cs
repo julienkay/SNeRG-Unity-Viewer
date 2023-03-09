@@ -55,18 +55,24 @@ public static class RaymarchShader {
 
             struct appdata {
                 float4 vertex : POSITION;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct v2f {
                 float4 vertex : SV_POSITION;
                 float3 origin : TEXCOORD1;
                 float3 direction : TEXCOORD2;
+                UNITY_VERTEX_OUTPUT_STEREO
             };
 
             v2f vert (appdata v) {
                 v2f o;
-                o.vertex = UnityObjectToClipPos(v.vertex);
 
+                UNITY_SETUP_INSTANCE_ID(v);
+                UNITY_INITIALIZE_OUTPUT(v2f, o);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+
+                o.vertex = UnityObjectToClipPos(v.vertex);
                 o.origin = mul(unity_WorldToObject, float4(_WorldSpaceCameraPos, 1));
                 o.direction = mul(unity_WorldToObject, -WorldSpaceViewDir(v.vertex));
 
