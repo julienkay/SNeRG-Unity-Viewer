@@ -420,6 +420,11 @@ public class SNeRGLoader {
         material.SetTexture("mapIndex", atlasIndexTexture);
     }
 
+    /// <summary>
+    /// Fills two distinct 3D textures from a set of atlassed PNGs.
+    /// This method flips both y and z axes of the 3D texture, because the original code assumes we're
+    /// indexing from top left, but Unity loaded the PNGs starting bottom right.
+    /// </summary>
     private static void loadSplitVolumeTexture(Texture2D[] rgbaArray, Texture3D alphaVolumeTexture, Texture3D rgbVolumeTexture, SceneParams sceneParams) {
         Debug.Assert(sceneParams.NumSlices == rgbaArray.Length, "Expected " + sceneParams.NumSlices + " RGBA slices, but found " + rgbaArray.Length);
 
@@ -429,41 +434,46 @@ public class SNeRGLoader {
 
         int slice_depth = 4;    // slices packed into one atlassed texture
         int num_slices = sceneParams.NumSlices;
-        int numPixels = volume_width * volume_height * slice_depth;    // pixels per atlassed texture
+        int ppAtlas = volume_width * volume_height * slice_depth;   // pixels per atlassed texture
+        int ppSlice = volume_width * volume_height;                 // pixels per volume slice
 
         NativeArray<byte> rgbPixels     = rgbVolumeTexture  .GetPixelData<byte>(0);
         NativeArray<byte> alphaPixels   = alphaVolumeTexture.GetPixelData<byte>(0);
 
-        Debug.Assert(rgbPixels  .Length == num_slices * numPixels * 3, "Mismatching RGB Texture Data. Expected: "   + num_slices * numPixels * 3 + ". Actual: + " + rgbPixels  .Length);
-        Debug.Assert(alphaPixels.Length == num_slices * numPixels    , "Mismatching alpha Texture Data. Expected: " + num_slices * numPixels     + ". Actual: + " + alphaPixels.Length);
+        Debug.Assert(rgbPixels  .Length == num_slices * ppAtlas * 3, "Mismatching RGB Texture Data. Expected: "   + num_slices * ppAtlas * 3 + ". Actual: + " + rgbPixels  .Length);
+        Debug.Assert(alphaPixels.Length == num_slices * ppAtlas    , "Mismatching alpha Texture Data. Expected: " + num_slices * ppAtlas     + ". Actual: + " + alphaPixels.Length);
 
         for (int i = 0; i < num_slices; i++) {
-            // _rgbaSlice is in ARGB format!
-            NativeArray<byte> _rgbaSlice = rgbaArray[i].GetPixelData<byte>(0);
-            Debug.Assert(_rgbaSlice.Length == numPixels * 4, "Mismatching RGBA Texture Data. Expected: " + numPixels * 4 + ". Actual: + " + _rgbaSlice.Length);
+            // rgba images are in ARGB format!
+            NativeArray<byte> _rgbaImageFourSlices = rgbaArray[i].GetPixelData<byte>(0);
+            Debug.Assert(_rgbaImageFourSlices.Length == ppAtlas * 4, "Mismatching RGBA Texture Data. Expected: " + ppAtlas * 4 + ". Actual: + " + _rgbaImageFourSlices.Length);
 
-            int baseIndexRGB = i * numPixels * 3;
-            int baseIndexAlpha = i * numPixels;
-            for (int j = 0; j < numPixels; j++) {
-                rgbPixels   [baseIndexRGB   + (j * 3)    ] = _rgbaSlice[j * 4 + 1];
-                rgbPixels   [baseIndexRGB   + (j * 3) + 1] = _rgbaSlice[j * 4 + 2];
-                rgbPixels   [baseIndexRGB   + (j * 3) + 2] = _rgbaSlice[j * 4 + 3];
-                alphaPixels [baseIndexAlpha +  j         ] = _rgbaSlice[j * 4    ];
+            for (int s_r = slice_depth - 1, s = 0; s_r >= 0; s_r--, s++) {
+
+                int baseIndexRGB   = (i * ppAtlas + s * ppSlice) * 3;
+                int baseIndexAlpha = (i * ppAtlas + s * ppSlice);
+                for (int j = 0; j < ppSlice; j++) {
+                    rgbPixels  [baseIndexRGB   + (j * 3)    ] = _rgbaImageFourSlices[((s_r * ppSlice + j) * 4) + 1];
+                    rgbPixels  [baseIndexRGB   + (j * 3) + 1] = _rgbaImageFourSlices[((s_r * ppSlice + j) * 4) + 2];
+                    rgbPixels  [baseIndexRGB   + (j * 3) + 2] = _rgbaImageFourSlices[((s_r * ppSlice + j) * 4) + 3];
+                    alphaPixels[baseIndexAlpha +  j         ] = _rgbaImageFourSlices[((s_r * ppSlice + j) * 4)    ];
+                }
             }
         }
 
         FlipY<Color24>(rgbVolumeTexture);
-        //FlipZ<Color24>(rgbVolumeTexture);
+        FlipZ<Color24>(rgbVolumeTexture);
         FlipY<byte>(alphaVolumeTexture);
-        //FlipZ<byte>(alphaVolumeTexture);
+        FlipZ<byte>(alphaVolumeTexture);
 
         rgbVolumeTexture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
         alphaVolumeTexture.Apply(updateMipmaps: true, makeNoLongerReadable: true);
-
     }
 
     /// <summary>
-    /// Fills an existing 3D RGBA texture from {url}_%03d.png.
+    /// Fills an existing 3D RGBA texture from atlassed PNGs.
+    /// This method flips both y and z axes of the 3D texture, because the original code assumes we're
+    /// indexing from top left, but Unity loaded the PNGs starting bottom right.
     /// </summary>
     private static void LoadVolumeTexture(Texture2D[] featureImages, Texture3D featureVolumeTexture, SceneParams sceneParams) {
         Debug.Assert(sceneParams.NumSlices == featureImages.Length, "Expected " + sceneParams.NumSlices + " feature slices, but found " + featureImages.Length);
@@ -474,23 +484,27 @@ public class SNeRGLoader {
 
         int slice_depth   = 4;    // slices packed into one atlassed texture
         long num_slices   = sceneParams.NumSlices;
-        int numPixels     = volume_width * volume_height * slice_depth;    // pixels per atlassed feature texture
+        int ppAtlas       = volume_width * volume_height * slice_depth;     // pixels per atlassed feature texture
+        int ppSlice       = volume_width * volume_height;                   // pixels per volume slice
 
         NativeArray<Color32> featurePixels = featureVolumeTexture.GetPixelData<Color32>(0);
-        Debug.Assert(featurePixels.Length == num_slices * numPixels, "Mismatching RGB Texture Data. Expected: " + num_slices * numPixels + ". Actual: + " + featurePixels.Length);
+        Debug.Assert(featurePixels.Length == num_slices * ppAtlas, "Mismatching RGB Texture Data. Expected: " + num_slices * ppAtlas + ". Actual: + " + featurePixels.Length);
 
         for (int i = 0; i < num_slices; i++) {
 
-            NativeArray<Color32> _featureSlice = featureImages[i].GetRawTextureData<Color32>();
-            Debug.Assert(_featureSlice.Length == numPixels, "Mismatching feature Texture Data. Expected: " + numPixels + ". Actual: + " + _featureSlice.Length);
+            NativeArray<Color32> _featureImageFourSlices = featureImages[i].GetRawTextureData<Color32>();
+            Debug.Assert(_featureImageFourSlices.Length == ppAtlas, "Mismatching feature Texture Data. Expected: " + ppAtlas + ". Actual: + " + _featureImageFourSlices.Length);
 
-            NativeSlice<Color32> dst = new NativeSlice<Color32>(featurePixels, i * numPixels, numPixels);
-            NativeSlice<Color32> src = new NativeSlice<Color32>(_featureSlice);
+            for (int s = slice_depth - 1; s >= 0; s--) {
+                int targetIndex = (i * ppAtlas) + (s * ppSlice);
+                NativeSlice<Color32> dst = new NativeSlice<Color32>(featurePixels, targetIndex, ppSlice);
+                NativeSlice<Color32> src = new NativeSlice<Color32>(_featureImageFourSlices, s * ppSlice, ppSlice);
 
-            dst.CopyFrom(src);
+                dst.CopyFrom(src);
+            }
         }
         FlipY<Color32>(featureVolumeTexture);
-        //FlipZ<Color32>(featureVolumeTexture);
+        FlipZ<Color32>(featureVolumeTexture);
 
         featureVolumeTexture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
     }
@@ -504,7 +518,7 @@ public class SNeRGLoader {
         int depth = texture.depth;
         NativeArray<T> data = texture.GetPixelData<T>(0);
         for (int z = 0; z < depth; z++) {
-            for (int y = 0; y < ((height + 1) / 2); y++) {
+            for (int y = 0; y < height / 2; y++) {
                 for (int x = 0; x < width; x++) {
                     int flippedY = height - y - 1;
                     int source = z * (width * height) + (flippedY * width) + x;
@@ -516,23 +530,31 @@ public class SNeRGLoader {
     }
 
     /// <summary>
-    /// Reverse the order of the depth slices of the 3D texture
+    /// Flips z - Reverses the order of the depth slices of the given 3D texture
     /// </summary>
     private static void FlipZ<T>(Texture3D texture) where T : struct {
         int width = texture.width;
         int height = texture.height;
         int depth = texture.depth;
+
+        int sliceSize = width * height;
+
         NativeArray<T> data = texture.GetPixelData<T>(0);
-        for (int z = 0; z < ((depth + 1) / 2); z++) {
-            for (int y = 0; y < height; y++) {
-                for (int x = 0; x < width; x++) {
-                    int flippedZ = depth - z - 1;
-                    int source = flippedZ * (width * height) + (y * width) + x;
-                    int target = z * (width * height) + (y * width) + x;
-                    (data[target], data[source]) = (data[source], data[target]);
-                }
-            }
+        NativeArray<T> tmp = new NativeArray<T>(sliceSize, Allocator.Temp);
+
+        for (int z = 0; z < depth / 2; z++) {
+            int slice1Index = z * sliceSize;
+            int slice2Index = (depth - z - 1) * sliceSize;
+
+            NativeSlice<T> slice1 = new NativeSlice<T>(data, slice1Index, sliceSize);
+            NativeSlice<T> slice2 = new NativeSlice<T>(data, slice2Index, sliceSize);
+
+            slice1.CopyTo(tmp);
+            slice1.CopyFrom(slice2);
+            slice2.CopyFrom(tmp);
         }
+
+        tmp.Dispose();
     }
 
     private struct Color24 {
@@ -569,10 +591,6 @@ public class SNeRGLoader {
         shaderSource = new Regex("BIAS_LIST_ZERO"    ).Replace(shaderSource, $"{biasListZero}");
         shaderSource = new Regex("BIAS_LIST_ONE"     ).Replace(shaderSource, $"{biasListOne}");
         shaderSource = new Regex("BIAS_LIST_TWO"     ).Replace(shaderSource, $"{biasListTwo}");
-
-        // tbd: whats the right approach here? original formula int(ceil(length(gridSize))) seems to
-        // produces pretty high value by default (e.g. 1300)
-        shaderSource = new Regex("MAX_STEP").Replace(shaderSource, "20");
 
         string shaderAssetPath = GetShaderAssetPath(scene);
         File.WriteAllText(shaderAssetPath, shaderSource);
