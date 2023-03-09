@@ -42,7 +42,6 @@ public static class RaymarchShader {
             float4 atlasSize;
             float voxelSize;
             float blockSize;
-            float4x4 worldspace_T_opengl;
             int maxStep;
 
             UNITY_DECLARE_TEX3D(mapAlpha);
@@ -369,6 +368,11 @@ public static class RaymarchShader {
                     visibility = 1.0 - filledAlpha;
                 }
 
+                // convert from Unity's right handed coordinate system
+                // to OpenGL coordinates used in the MLP evaluation
+                i.direction.xz = -i.direction.xz;
+                i.direction.yz = i.direction.zy;
+
                 // Compute the final color, to save compute only compute view-depdence
                 // for rays that intersected something in the scene.
                 color = half3(1.0, 1.0, 1.0) * visibility + color;
@@ -376,7 +380,7 @@ public static class RaymarchShader {
                 if (visibility <= kVisibilityThreshold &&
                     (displayMode == DISPLAY_NORMAL ||
                      displayMode == DISPLAY_VIEW_DEPENDENT)) {
-                  color += evaluateNetwork(color, features, mul(worldspace_T_opengl, normalize(i.direction)));
+                  color += evaluateNetwork(color, features, normalize(i.direction));
                 }
 
                 return fixed4(color, 1.0);
