@@ -495,10 +495,10 @@ public class SNeRGLoader {
             NativeArray<Color32> _featureImageFourSlices = featureImages[i].GetRawTextureData<Color32>();
             Debug.Assert(_featureImageFourSlices.Length == ppAtlas, "Mismatching feature Texture Data. Expected: " + ppAtlas + ". Actual: + " + _featureImageFourSlices.Length);
 
-            for (int s = slice_depth - 1; s >= 0; s--) {
+            for (int s_r = slice_depth - 1, s = 0; s_r >= 0; s_r--, s++) {
                 int targetIndex = (i * ppAtlas) + (s * ppSlice);
                 NativeSlice<Color32> dst = new NativeSlice<Color32>(featurePixels, targetIndex, ppSlice);
-                NativeSlice<Color32> src = new NativeSlice<Color32>(_featureImageFourSlices, s * ppSlice, ppSlice);
+                NativeSlice<Color32> src = new NativeSlice<Color32>(_featureImageFourSlices, s_r * ppSlice, ppSlice);
 
                 dst.CopyFrom(src);
             }
