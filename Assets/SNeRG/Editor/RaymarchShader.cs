@@ -25,6 +25,7 @@ public static class RaymarchShader {
         Cull Front
         ZWrite Off
         ZTest Always
+        Blend SrcAlpha OneMinusSrcAlpha
 
         Pass {
             CGPROGRAM
@@ -271,7 +272,7 @@ public static class RaymarchShader {
 
                 // Skip any rays that miss the scene bounding box.
                 if (tMinMax.x > tMinMax.y) {
-                  return fixed4(1.0, 1.0, 1.0, 1.0);
+                    discard;
                 }
 
                 float t = max(nearPlane / voxelSize, tMinMax.x) + 0.5;
@@ -392,7 +393,7 @@ public static class RaymarchShader {
                   color += evaluateNetwork(color, features, normalize(i.direction));
                 }
 
-                return fixed4(color, 1.0);
+                return fixed4(color, alpha);
             }
             ENDCG
         }
