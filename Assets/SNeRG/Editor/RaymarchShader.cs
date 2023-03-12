@@ -56,7 +56,7 @@ public static class RaymarchShader {
             UNITY_DECLARE_TEX2D(weightsOne);
             UNITY_DECLARE_TEX2D(weightsTwo);
 
-            sampler2D _CameraDepthTexture;
+            UNITY_DECLARE_DEPTH_TEXTURE(_CameraDepthTexture);
 
             struct appdata {
                 float4 vertex : POSITION;
