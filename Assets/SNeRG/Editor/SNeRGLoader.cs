@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.AI;
 using static WebRequestAsyncUtility;
 
 public class SNeRGLoader {
@@ -161,7 +162,11 @@ public class SNeRGLoader {
         Directory.CreateDirectory(Path.GetDirectoryName(path));
         return path;
     }
-
+    private static string GetMeshAssetPath(SNeRGScene scene) {
+        string path = $"{GetBasePath(scene)}/Volume Mesh/{scene.String()} Volume Mesh.asset";
+        Directory.CreateDirectory(Path.GetDirectoryName(path));
+        return path;
+    }
 
     private static string GetAtlasIndexCachePath(SNeRGScene scene) {
         string path = $"{GetCacheLocation(scene)}/atlas_indices.png";
@@ -744,9 +749,37 @@ public class SNeRGLoader {
         string materialAssetPath = GetMaterialAssetPath(scene);
         Material material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
         renderer.material = material;
+        // create mesh copy and scale by volume extents to be able to raymarchin object space
+        MeshFilter meshFilter = prefabObject.GetComponent<MeshFilter>();
+        meshFilter.sharedMesh = CreateMesh(meshFilter.sharedMesh, sceneParams);
+        meshFilter.sharedMesh.name = $"{scene}_volume_mesh";
+        AssetDatabase.CreateAsset(meshFilter.sharedMesh, GetMeshAssetPath(scene));
         prefabObject.AddComponent<EnableDepthTexture>();
         PrefabUtility.SaveAsPrefabAsset(prefabObject, GetPrefabAssetPath(scene));
         GameObject.DestroyImmediate(prefabObject);
+    }
+
+    private static Mesh CreateMesh(Mesh mesh, SceneParams sceneParams) {
+        var vertices = mesh.vertices;
+        for(int i = 0; i < vertices.Length; i++) {
+            Vector3 v = vertices[i];
+            v.Scale(new Vector3(
+                Mathf.Abs((float)sceneParams.MinX),
+                Mathf.Abs((float)sceneParams.MinY),
+                Mathf.Abs((float)sceneParams.MinZ))
+                * 2f
+            );
+            vertices[i] = v;
+        }
+        Mesh newMesh = new Mesh {
+            vertices  = vertices,
+            triangles = mesh.triangles,
+            uv        = mesh.uv,
+            normals   = mesh.normals,
+            colors    = mesh.colors,
+            tangents  = mesh.tangents
+        };
+        return newMesh;
     }
 }
 

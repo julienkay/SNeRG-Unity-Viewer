@@ -79,8 +79,6 @@ public static class RaymarchShader {
                 UNITY_INITIALIZE_OUTPUT(v2f, o);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
-                // scale cube to encompass volume, assumes we're rendering on a standard Unity cube
-                v.vertex = float4(v.vertex.xyz * abs(minPosition.xyz) * 2, v.vertex.w);
                 o.vertex = UnityObjectToClipPos(v.vertex);
 
                 // set up values to raymarch in object space
