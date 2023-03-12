@@ -22,6 +22,8 @@ public static class RaymarchShader {
         maxStep (""Max Step"", Integer) = 0.0
     }
     SubShader {
+        Tags { ""Queue"" = ""Geometry+1"" }
+        
         Cull Front
         ZWrite Off
         ZTest Always
@@ -54,6 +56,8 @@ public static class RaymarchShader {
             UNITY_DECLARE_TEX2D(weightsOne);
             UNITY_DECLARE_TEX2D(weightsTwo);
 
+            sampler2D _CameraDepthTexture;
+
             struct appdata {
                 float4 vertex : POSITION;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
@@ -63,6 +67,8 @@ public static class RaymarchShader {
                 float4 vertex : SV_POSITION;
                 float3 origin : TEXCOORD1;
                 float3 direction : TEXCOORD2;
+                float4 projPos : TEXCOORD3;
+                float3 camRelativeWorldPos : TEXCOORD4;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -73,13 +79,18 @@ public static class RaymarchShader {
                 UNITY_INITIALIZE_OUTPUT(v2f, o);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
+                // scale cube to encompass volume, assumes we're rendering on a standard Unity cube
+                v.vertex = float4(v.vertex.xyz * abs(minPosition.xyz) * 2, v.vertex.w);
                 o.vertex = UnityObjectToClipPos(v.vertex);
+
+                // set up values to raymarch in object space
                 o.origin = mul(unity_WorldToObject, float4(_WorldSpaceCameraPos, 1));
-                o.direction = mul(unity_WorldToObject, -WorldSpaceViewDir(v.vertex));
+                o.direction = -ObjSpaceViewDir(v.vertex);
 
-                // assumes we're rendering on a unit cube
-                o.origin *= abs(minPosition) * 2;
-
+                // set up values to test against scene depth for proper composition with opaque scene objects
+                o.projPos = ComputeScreenPos(o.vertex);
+                o.camRelativeWorldPos = mul(unity_ObjectToWorld, float4(v.vertex.xyz, 1.0)).xyz - _WorldSpaceCameraPos;
+              
                 return o;
             }
 
@@ -295,8 +306,21 @@ public static class RaymarchShader {
                 half4 features = half4(0.0, 0.0, 0.0, 0.0);
                 int step = 0;
 
+                // sample scene depth and calculate maximum ray distance in voxel grid space
+                float depth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, i.projPos.xy / i.projPos.w).r;
+                float linearDepth = LinearEyeDepth(depth);
+
+                // reconstruct world position in voxel grid space
+                float3 viewPlane = (i.camRelativeWorldPos) / dot((i.camRelativeWorldPos), mul(float3(0.0,0.0,-1.0), UNITY_MATRIX_V));
+                float3 sceneDepthWorld = viewPlane * linearDepth + _WorldSpaceCameraPos;
+                float3 sceneDepthObj = mul(unity_WorldToObject, float4(sceneDepthWorld, 1.0));
+                float3 sceneDepthGrid = ((sceneDepthObj -  minPosition.xyz) / voxelSize) + 0.5;
+                
+                // maximum ray distance to march in voxel grid space
+                float maxDist = distance(sceneDepthGrid, originGrid);
+
                 [loop]
-                while (step < maxStep && t < tMinMax.y && visibility > 1.0 / 255.0) {
+                while (step < maxStep && t < maxDist && t < tMinMax.y && visibility > 1.0 / 255.0) {
                     // Skip empty macroblocks.
                     if (atlasBlockIndex.x > 254.0) {
                         t = 0.5 + tBlockMinMax.y;
@@ -383,7 +407,7 @@ public static class RaymarchShader {
                 i.direction.xz = -i.direction.xz;
                 i.direction.yz = i.direction.zy;
 
-                // Compute the final color, to save compute only compute view-depdence
+                // Compute the final color, to save compute only compute view-dependence
                 // for rays that intersected something in the scene.
                 color = half3(1.0, 1.0, 1.0) * visibility + color;
                 const float kVisibilityThreshold = 254.0 / 255.0;

@@ -744,6 +744,7 @@ public class SNeRGLoader {
         string materialAssetPath = GetMaterialAssetPath(scene);
         Material material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
         renderer.material = material;
+        prefabObject.AddComponent<EnableDepthTexture>();
         PrefabUtility.SaveAsPrefabAsset(prefabObject, GetPrefabAssetPath(scene));
         GameObject.DestroyImmediate(prefabObject);
     }
