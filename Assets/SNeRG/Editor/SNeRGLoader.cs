@@ -63,23 +63,6 @@ public class SNeRGLoader {
         ImportAssetsAsync(SNeRGScene.Materials);
     }
 
-    [MenuItem("SNeRG/Asset Downloads/Spheres", false, 50)]
-    public static void DownloadSpheresAssets() {
-        ImportAssetsAsync(SNeRGScene.Spheres);
-    }
-    [MenuItem("SNeRG/Asset Downloads/Vase Deck", false, 50)]
-    public static void DownloadVaseDeckAssets() {
-        ImportAssetsAsync(SNeRGScene.VaseDeck);
-    }
-    [MenuItem("SNeRG/Asset Downloads/Pine Cone", false, 50)]
-    public static void DownloadPineConeAssets() {
-        ImportAssetsAsync(SNeRGScene.PineCone);
-    }
-    [MenuItem("SNeRG/Asset Downloads/Toy Car", false, 50)]
-    public static void DownloadToyCarAssets() {
-        ImportAssetsAsync(SNeRGScene.ToyCar);
-    }
-
 #pragma warning restore CS4014
 
     private const string BASE_URL_SYNTH = "https://storage.googleapis.com/snerg/750/";
