@@ -244,6 +244,8 @@ public static class RaymarchShader {
             }
 
             fixed4 frag (v2f i) : SV_Target {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+                
                 // Runs the full model with view dependence.
                 const int DISPLAY_NORMAL = 0;
                 // Disables the view-dependence network.
