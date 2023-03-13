@@ -1,5 +1,7 @@
 # SNeRG Unity Viewer
 
+https://user-images.githubusercontent.com/26555424/224686209-113c4a0f-860e-4b8c-9158-430b4ba2d2a9.mp4
+
 This repository contains the source code for a Unity port of the web viewer for [Baking Neural Radiance Fields for Real-Time View Synthesis](https://phog.github.io/snerg/)[^1]
 
 *Please note, that this is an unofficial port. I am not affiliated with the original authors or their institution.*
