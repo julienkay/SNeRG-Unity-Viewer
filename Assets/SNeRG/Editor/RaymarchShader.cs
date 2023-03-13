@@ -245,7 +245,7 @@ public static class RaymarchShader {
 
             fixed4 frag (v2f i) : SV_Target {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
-                
+
                 // Runs the full model with view dependence.
                 const int DISPLAY_NORMAL = 0;
                 // Disables the view-dependence network.
@@ -416,6 +416,10 @@ public static class RaymarchShader {
                      displayMode == DISPLAY_VIEW_DEPENDENT)) {
                   color += evaluateNetwork(color, features, normalize(i.direction));
                 }
+
+                #if !UNITY_COLORSPACE_GAMMA
+                    color = GammaToLinearSpace(color);
+                #endif
 
                 return fixed4(color, alpha);
             }
