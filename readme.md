@@ -20,7 +20,7 @@ If performance is not great, you can try to reduce the "Max Step" property on th
 ## Updating
 
 Since the initial release a number of issues have been fixed in the asset generation code.
-That means, that if you have already imported some scenes before, you'll have to delete these source files and regenerate them by going to *SNeRF -> Asset Downloads* again.
+That means, that if you have already imported some scenes before, you'll have to delete these source files and regenerate them by going to *SNeRG -> Asset Downloads* again.
 
 ## Details
 
