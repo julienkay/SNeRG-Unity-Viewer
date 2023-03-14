@@ -28,41 +28,55 @@ public class SNeRGLoader {
         return false;
     }
 
-#pragma warning disable CS4014
     [MenuItem("SNeRG/Asset Downloads/Lego", false, 0)]
-    public static void DownloadLegoAssets() {
-        ImportAssetsAsync(SNeRGScene.Lego);
+    public async static void DownloadLegoAssets() {
+        await ImportAssetsAsync(SNeRGScene.Lego);
     }
     [MenuItem("SNeRG/Asset Downloads/Chair", false, 0)]
-    public static void DownloadChairAssets() {
-        ImportAssetsAsync(SNeRGScene.Chair);
+    public async static void DownloadChairAssets() {
+        await ImportAssetsAsync(SNeRGScene.Chair);
     }
     [MenuItem("SNeRG/Asset Downloads/Drums", false, 0)]
-    public static void DownloadDrumsAssets() {
-        ImportAssetsAsync(SNeRGScene.Drums);
+    public async static void DownloadDrumsAssets() {
+        await ImportAssetsAsync(SNeRGScene.Drums);
     }
     [MenuItem("SNeRG/Asset Downloads/Hotdog", false, 0)]
-    public static void DownloadHotdogAssets() {
-        ImportAssetsAsync(SNeRGScene.Hotdog);
+    public async static void DownloadHotdogAssets() {
+        await ImportAssetsAsync(SNeRGScene.Hotdog);
     }
     [MenuItem("SNeRG/Asset Downloads/Ship", false, 0)]
-    public static void DownloadShipsAssets() {
-        ImportAssetsAsync(SNeRGScene.Ship);
+    public async static void DownloadShipsAssets() {
+        await ImportAssetsAsync(SNeRGScene.Ship);
     }
     [MenuItem("SNeRG/Asset Downloads/Mic", false, 0)]
-    public static void DownloadMicAssets() {
-        ImportAssetsAsync(SNeRGScene.Mic);
+    public async static void DownloadMicAssets() {
+        await ImportAssetsAsync(SNeRGScene.Mic);
     }
     [MenuItem("SNeRG/Asset Downloads/Ficus", false, 0)]
-    public static void DownloadFicusAssets() {
-        ImportAssetsAsync(SNeRGScene.Ficus);
+    public async static void DownloadFicusAssets() {
+        await ImportAssetsAsync(SNeRGScene.Ficus);
     }
     [MenuItem("SNeRG/Asset Downloads/Materials", false, 0)]
-    public static void DownloadMaterialsAssets() {
-        ImportAssetsAsync(SNeRGScene.Materials);
+    public async static void DownloadMaterialsAssets() {
+        await ImportAssetsAsync(SNeRGScene.Materials);
     }
 
-#pragma warning restore CS4014
+    [MenuItem("SNeRG/Asset Downloads/Spheres", false, 50)]
+    public async static void DownloadSpheresAssets() {
+        await ImportAssetsAsync(SNeRGScene.Spheres);
+    }
+    [MenuItem("SNeRG/Asset Downloads/Vase Deck", false, 50)]
+    public async static void DownloadVaseDeckAssets() {
+        await ImportAssetsAsync(SNeRGScene.VaseDeck);
+    }
+    [MenuItem("SNeRG/Asset Downloads/Pine Cone", false, 50)]
+    public async static void DownloadPineConeAssets() {
+        await ImportAssetsAsync(SNeRGScene.PineCone);
+    }
+    [MenuItem("SNeRG/Asset Downloads/Toy Car", false, 50)]
+    public async static void DownloadToyCarAssets() {
+        await ImportAssetsAsync(SNeRGScene.ToyCar);
+    }
 
     private const string BASE_URL_SYNTH = "https://storage.googleapis.com/snerg/750/";
     private const string BASE_URL_REAL = "https://storage.googleapis.com/snerg/real_1000/";
@@ -449,9 +463,9 @@ public class SNeRGLoader {
         }
 
         FlipY<Color24>(rgbVolumeTexture);
-        FlipZ<Color24>(rgbVolumeTexture);
+        FlipZ<Color24>(rgbVolumeTexture, sceneParams.AtlasBlocksZ);
         FlipY<byte>(alphaVolumeTexture);
-        FlipZ<byte>(alphaVolumeTexture);
+        FlipZ<byte>(alphaVolumeTexture , sceneParams.AtlasBlocksZ);
 
         rgbVolumeTexture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
         alphaVolumeTexture.Apply(updateMipmaps: true, makeNoLongerReadable: true);
@@ -491,7 +505,7 @@ public class SNeRGLoader {
             }
         }
         FlipY<Color32>(featureVolumeTexture);
-        FlipZ<Color32>(featureVolumeTexture);
+        FlipZ<Color32>(featureVolumeTexture, sceneParams.AtlasBlocksZ);
 
         featureVolumeTexture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
     }
@@ -517,28 +531,34 @@ public class SNeRGLoader {
     }
 
     /// <summary>
-    /// Flips z - Reverses the order of the depth slices of the given 3D texture
+    /// Flips z - Reverses the order of the depth slices of the given 3D texture.
+    /// Atlases might be divided in macro blocks that are treated individually here.
+    /// I.e. depth slices are only reversed within a block.
     /// </summary>
-    private static void FlipZ<T>(Texture3D texture) where T : struct {
+    private static void FlipZ<T>(Texture3D texture, int atlasBlocksZ) where T : struct {
         int width = texture.width;
         int height = texture.height;
         int depth = texture.depth;
-
+        int stride = depth / atlasBlocksZ;
+        int blockSize = width * height * stride;
         int sliceSize = width * height;
 
         NativeArray<T> data = texture.GetPixelData<T>(0);
         NativeArray<T> tmp = new NativeArray<T>(sliceSize, Allocator.Temp);
 
-        for (int z = 0; z < depth / 2; z++) {
-            int slice1Index = z * sliceSize;
-            int slice2Index = (depth - z - 1) * sliceSize;
+        for (int z = 0; z < atlasBlocksZ; z++) {
+            for (int s = 0; s < stride / 2; s++) {
+                int atlasBlock = z * blockSize;
+                int slice1Index = atlasBlock + s * sliceSize;
+                int slice2Index = atlasBlock + ((stride - s - 1) * sliceSize);
 
-            NativeSlice<T> slice1 = new NativeSlice<T>(data, slice1Index, sliceSize);
-            NativeSlice<T> slice2 = new NativeSlice<T>(data, slice2Index, sliceSize);
+                NativeSlice<T> slice1 = new NativeSlice<T>(data, slice1Index, sliceSize);
+                NativeSlice<T> slice2 = new NativeSlice<T>(data, slice2Index, sliceSize);
 
-            slice1.CopyTo(tmp);
-            slice1.CopyFrom(slice2);
-            slice2.CopyFrom(tmp);
+                slice1.CopyTo(tmp);
+                slice1.CopyFrom(slice2);
+                slice2.CopyFrom(tmp);
+            }
         }
 
         tmp.Dispose();

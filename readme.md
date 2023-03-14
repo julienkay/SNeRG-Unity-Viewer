@@ -17,6 +17,11 @@ In each scene folder, there will be a convenient prefab, that you can then drag 
 
 If performance is not great, you can try to reduce the "Max Step" property on the material to trade off some quality vs speed.
 
+## Updating
+
+Since the initial release a number of issues have been fixed in the asset generation code.
+That means, that if you have already imported some scenes before, you'll have to delete these source files and regenerate them by going to *SNeRF -> Asset Downloads* again.
+
 ## Details
 
 This project was created with Unity 2021.3 LTS using the Built-in Render Pipeline.
@@ -27,7 +32,6 @@ Deviations from the official viewer:
 
 ## Known Issues
 
-- Currently, only the 'Synthetic Rendered Scenes' are supported. The 'Real Captured Scenes' still have some issues. 
 - Memory requirements for working with 3D textures in Unity are quite high. The way the import process works right now is that Texture3D assets are created in-Editor. The memory that Unity uses when serializing these as assets on disk is a bit too high for my liking. Granted, the size of these scenes can go up to Gigabytes. However, I've found that 16GB of RAM was often not enough to handle the import/creation of 2GB of uncompressed 3D textures due to inefficiencies. I wasn’t even able to import some of the larger scenes until upgrading to 32GB RAM.  
 A possible solution to this might be to defer the 3D texture creation and import the volumes into Unity as individual 2D slices, (similar to how the official web viewer distributes the data) and only assemble the 3D textures at runtime. For development, it was quite useful to preview the volume without having to enter Play Mode though. But some scenes are currently just very difficult to handle, even when your GPU could fit the data into VRAM just fine.  
 This is all assuming you have set the Asset Serialization Mode to 'Force Binary', which I have done for this project. Text serialization would otherwise be close to unusable. Unfortunately, the Asset Serialization Mode seems to be a project-wide setting, which is a bit inconvenient for use in real-world projects I imagine.  
