@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.AI;
 using static WebRequestAsyncUtility;
 
 public class SNeRGLoader {
@@ -417,7 +416,7 @@ public class SNeRGLoader {
         Debug.Assert(sceneParams.NumSlices == rgbaArray.Length, "Expected " + sceneParams.NumSlices + " RGBA slices, but found " + rgbaArray.Length);
 
         int volume_width  = sceneParams.AtlasWidth;
-        int volume_height = sceneParams.AtlasWidth; 
+        int volume_height = sceneParams.AtlasHeight; 
         int volume_depth  = sceneParams.AtlasDepth;
 
         int slice_depth = 4;    // slices packed into one atlassed texture
@@ -467,7 +466,7 @@ public class SNeRGLoader {
         Debug.Assert(sceneParams.NumSlices == featureImages.Length, "Expected " + sceneParams.NumSlices + " feature slices, but found " + featureImages.Length);
 
         int volume_width  = sceneParams.AtlasWidth;
-        int volume_height = sceneParams.AtlasWidth;
+        int volume_height = sceneParams.AtlasHeight;
         int volume_depth  = sceneParams.AtlasDepth;
 
         int slice_depth   = 4;    // slices packed into one atlassed texture
@@ -621,7 +620,7 @@ public class SNeRGLoader {
         );
         material.SetFloat("voxelSize", (float)sceneParams.VoxelSize);
         material.SetFloat("blockSize", (float)sceneParams.BlockSize);
-        int maxStep = Mathf.CeilToInt(new Vector3(sceneParams.GridWidth, sceneParams.GridWidth, sceneParams.GridDepth).magnitude);
+        int maxStep = Mathf.CeilToInt(new Vector3(sceneParams.GridWidth, sceneParams.GridHeight, sceneParams.GridDepth).magnitude);
         material.SetInteger("maxStep", maxStep);
 
         // volume texture properties will be assigned when creating the 3D textures to avoid having to load them into memory here
