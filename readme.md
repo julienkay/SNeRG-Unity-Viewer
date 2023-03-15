@@ -15,8 +15,6 @@ I recommend 32GB of RAM and a graphics card with 4GB of VRAM.
 After cloning the project you can simply use the menu *SNeRG -> Asset Downloads* to download any of the sample scenes available.
 In each scene folder, there will be a convenient prefab, that you can then drag into the scene and you're good to go.
 
-If performance is not great, you can try to reduce the "Max Step" property on the material to trade off some quality vs speed.
-
 ## Updating
 
 Since the initial release a number of issues have been fixed in the asset generation code.
