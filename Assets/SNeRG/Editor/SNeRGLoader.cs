@@ -422,42 +422,42 @@ public class SNeRGLoader {
     }
 
     /// <summary>
-    /// Fills two distinct 3D textures from a set of atlassed PNGs.
+    /// Fills two distinct 3D textures from a set of atlased PNGs.
     /// This method flips both y and z axes of the 3D texture, because the original code assumes we're
     /// indexing from top left, but Unity loaded the PNGs starting bottom right.
     /// </summary>
     private static void loadSplitVolumeTexture(Texture2D[] rgbaArray, Texture3D alphaVolumeTexture, Texture3D rgbVolumeTexture, SceneParams sceneParams) {
         Debug.Assert(sceneParams.NumSlices == rgbaArray.Length, "Expected " + sceneParams.NumSlices + " RGBA slices, but found " + rgbaArray.Length);
 
-        int volume_width  = sceneParams.AtlasWidth;
-        int volume_height = sceneParams.AtlasHeight; 
-        int volume_depth  = sceneParams.AtlasDepth;
+        int volumeWidth  = sceneParams.AtlasWidth;
+        int volumeHeight = sceneParams.AtlasHeight; 
+        int volumeDepth  = sceneParams.AtlasDepth;
 
-        int slice_depth = 4;    // slices packed into one atlassed texture
-        int num_slices = sceneParams.NumSlices;
-        int ppAtlas = volume_width * volume_height * slice_depth;   // pixels per atlassed texture
-        int ppSlice = volume_width * volume_height;                 // pixels per volume slice
+        int sliceDepth = 4;                                       // slices packed into one atlased texture
+        int numSlices  = sceneParams.NumSlices;                   // number of slice atlases
+        int ppAtlas    = volumeWidth * volumeHeight * sliceDepth; // pixels per atlased texture
+        int ppSlice    = volumeWidth * volumeHeight;              // pixels per volume slice
 
         NativeArray<byte> rgbPixels     = rgbVolumeTexture  .GetPixelData<byte>(0);
         NativeArray<byte> alphaPixels   = alphaVolumeTexture.GetPixelData<byte>(0);
 
-        Debug.Assert(rgbPixels  .Length == num_slices * ppAtlas * 3, "Mismatching RGB Texture Data. Expected: "   + num_slices * ppAtlas * 3 + ". Actual: + " + rgbPixels  .Length);
-        Debug.Assert(alphaPixels.Length == num_slices * ppAtlas    , "Mismatching alpha Texture Data. Expected: " + num_slices * ppAtlas     + ". Actual: + " + alphaPixels.Length);
+        Debug.Assert(rgbPixels  .Length == numSlices * ppAtlas * 3, "Mismatching RGB Texture Data. Expected: "   + numSlices * ppAtlas * 3 + ". Actual: + " + rgbPixels  .Length);
+        Debug.Assert(alphaPixels.Length == numSlices * ppAtlas    , "Mismatching alpha Texture Data. Expected: " + numSlices * ppAtlas     + ". Actual: + " + alphaPixels.Length);
 
-        for (int i = 0; i < num_slices; i++) {
+        for (int i = 0; i < numSlices; i++) {
             // rgba images are in ARGB format!
-            NativeArray<byte> _rgbaImageFourSlices = rgbaArray[i].GetPixelData<byte>(0);
-            Debug.Assert(_rgbaImageFourSlices.Length == ppAtlas * 4, "Mismatching RGBA Texture Data. Expected: " + ppAtlas * 4 + ". Actual: + " + _rgbaImageFourSlices.Length);
+            NativeArray<byte> rgbaImageFourSlices = rgbaArray[i].GetPixelData<byte>(0);
+            Debug.Assert(rgbaImageFourSlices.Length == ppAtlas * 4, "Mismatching RGBA Texture Data. Expected: " + ppAtlas * 4 + ". Actual: + " + rgbaImageFourSlices.Length);
 
-            for (int s_r = slice_depth - 1, s = 0; s_r >= 0; s_r--, s++) {
+            for (int s_r = sliceDepth - 1, s = 0; s_r >= 0; s_r--, s++) {
 
                 int baseIndexRGB   = (i * ppAtlas + s * ppSlice) * 3;
                 int baseIndexAlpha = (i * ppAtlas + s * ppSlice);
                 for (int j = 0; j < ppSlice; j++) {
-                    rgbPixels  [baseIndexRGB   + (j * 3)    ] = _rgbaImageFourSlices[((s_r * ppSlice + j) * 4) + 1];
-                    rgbPixels  [baseIndexRGB   + (j * 3) + 1] = _rgbaImageFourSlices[((s_r * ppSlice + j) * 4) + 2];
-                    rgbPixels  [baseIndexRGB   + (j * 3) + 2] = _rgbaImageFourSlices[((s_r * ppSlice + j) * 4) + 3];
-                    alphaPixels[baseIndexAlpha +  j         ] = _rgbaImageFourSlices[((s_r * ppSlice + j) * 4)    ];
+                    rgbPixels  [baseIndexRGB   + (j * 3)    ] = rgbaImageFourSlices[((s_r * ppSlice + j) * 4) + 1];
+                    rgbPixels  [baseIndexRGB   + (j * 3) + 1] = rgbaImageFourSlices[((s_r * ppSlice + j) * 4) + 2];
+                    rgbPixels  [baseIndexRGB   + (j * 3) + 2] = rgbaImageFourSlices[((s_r * ppSlice + j) * 4) + 3];
+                    alphaPixels[baseIndexAlpha +  j         ] = rgbaImageFourSlices[((s_r * ppSlice + j) * 4)    ];
                 }
             }
         }
@@ -472,31 +472,31 @@ public class SNeRGLoader {
     }
 
     /// <summary>
-    /// Fills an existing 3D RGBA texture from atlassed PNGs.
+    /// Fills an existing 3D RGBA texture from atlased PNGs.
     /// This method flips both y and z axes of the 3D texture, because the original code assumes we're
     /// indexing from top left, but Unity loaded the PNGs starting bottom right.
     /// </summary>
     private static void LoadVolumeTexture(Texture2D[] featureImages, Texture3D featureVolumeTexture, SceneParams sceneParams) {
         Debug.Assert(sceneParams.NumSlices == featureImages.Length, "Expected " + sceneParams.NumSlices + " feature slices, but found " + featureImages.Length);
 
-        int volume_width  = sceneParams.AtlasWidth;
-        int volume_height = sceneParams.AtlasHeight;
-        int volume_depth  = sceneParams.AtlasDepth;
+        int volumeWidth  = sceneParams.AtlasWidth;
+        int volumeHeight = sceneParams.AtlasHeight;
+        int volumeDepth  = sceneParams.AtlasDepth;
 
-        int slice_depth   = 4;    // slices packed into one atlassed texture
-        long num_slices   = sceneParams.NumSlices;
-        int ppAtlas       = volume_width * volume_height * slice_depth;     // pixels per atlassed feature texture
-        int ppSlice       = volume_width * volume_height;                   // pixels per volume slice
+        int sliceDepth   = 4;                                       // slices packed into one atlased texture
+        long numSlices   = sceneParams.NumSlices;                   // number of slice atlases
+        int ppAtlas      = volumeWidth * volumeHeight * sliceDepth; // pixels per atlased feature texture
+        int ppSlice      = volumeWidth * volumeHeight;              // pixels per volume slice
 
         NativeArray<Color32> featurePixels = featureVolumeTexture.GetPixelData<Color32>(0);
-        Debug.Assert(featurePixels.Length == num_slices * ppAtlas, "Mismatching RGB Texture Data. Expected: " + num_slices * ppAtlas + ". Actual: + " + featurePixels.Length);
+        Debug.Assert(featurePixels.Length == numSlices * ppAtlas, "Mismatching RGB Texture Data. Expected: " + numSlices * ppAtlas + ". Actual: + " + featurePixels.Length);
 
-        for (int i = 0; i < num_slices; i++) {
+        for (int i = 0; i < numSlices; i++) {
 
             NativeArray<Color32> _featureImageFourSlices = featureImages[i].GetRawTextureData<Color32>();
             Debug.Assert(_featureImageFourSlices.Length == ppAtlas, "Mismatching feature Texture Data. Expected: " + ppAtlas + ". Actual: + " + _featureImageFourSlices.Length);
 
-            for (int s_r = slice_depth - 1, s = 0; s_r >= 0; s_r--, s++) {
+            for (int s_r = sliceDepth - 1, s = 0; s_r >= 0; s_r--, s++) {
                 int targetIndex = (i * ppAtlas) + (s * ppSlice);
                 NativeSlice<Color32> dst = new NativeSlice<Color32>(featurePixels, targetIndex, ppSlice);
                 NativeSlice<Color32> src = new NativeSlice<Color32>(_featureImageFourSlices, s_r * ppSlice, ppSlice);
