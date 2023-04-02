@@ -1,5 +1,4 @@
 using Newtonsoft.Json;
-using System;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -14,6 +13,11 @@ public class SNeRGLoader {
     private static readonly string LoadingTitle = "Loading Assets";
     private static readonly string ProcessingTitle = "Processing Assets";
     private static readonly string DownloadInfo = "Loading Assets for ";
+    private static readonly string FolderTitle = "Select folder with SNeRG source files";
+    private static readonly string FolderExistsTitle = "Folder already exists";
+    private static readonly string FolderExistsMsg = "A folder for this asset already exists in the Unity project. Overwrite?";
+    private static readonly string OK = "OK";
+    private static readonly string ImportErrorTitle = "Error importing SNeRG assets";
 
     [MenuItem("SNeRG/Asset Downloads/-- Synthetic Rendered Scenes --", false, -1)]
     public static void Separator0() { }
@@ -28,213 +32,323 @@ public class SNeRGLoader {
         return false;
     }
 
+    [MenuItem("SNeRG/Import from disk", false, 0)]
+    public async static void ImportAssetsFromDisk() {
+        // select folder with custom data
+        string path = EditorUtility.OpenFolderPanel(FolderTitle, "", "");
+        if (string.IsNullOrEmpty(path) || !Directory.Exists(path)) {
+            return;
+        }
+
+        // ask whether to overwrite existing folder
+        string objName = new DirectoryInfo(path).Name;
+        if (Directory.Exists($"{BASE_FOLDER}{objName}")) {
+            if (!EditorUtility.DisplayDialog(FolderExistsTitle, FolderExistsMsg, OK)) {
+                return;
+            }
+        }
+
+        await ImportCustomScene(path);
+    }
+
     [MenuItem("SNeRG/Asset Downloads/Lego", false, 0)]
     public async static void DownloadLegoAssets() {
-        await ImportAssetsAsync(SNeRGScene.Lego);
+        await ImportDemoSceneAsync(SNeRGScene.Lego);
     }
     [MenuItem("SNeRG/Asset Downloads/Chair", false, 0)]
     public async static void DownloadChairAssets() {
-        await ImportAssetsAsync(SNeRGScene.Chair);
+        await ImportDemoSceneAsync(SNeRGScene.Chair);
     }
     [MenuItem("SNeRG/Asset Downloads/Drums", false, 0)]
     public async static void DownloadDrumsAssets() {
-        await ImportAssetsAsync(SNeRGScene.Drums);
+        await ImportDemoSceneAsync(SNeRGScene.Drums);
     }
     [MenuItem("SNeRG/Asset Downloads/Hotdog", false, 0)]
     public async static void DownloadHotdogAssets() {
-        await ImportAssetsAsync(SNeRGScene.Hotdog);
+        await ImportDemoSceneAsync(SNeRGScene.Hotdog);
     }
     [MenuItem("SNeRG/Asset Downloads/Ship", false, 0)]
     public async static void DownloadShipsAssets() {
-        await ImportAssetsAsync(SNeRGScene.Ship);
+        await ImportDemoSceneAsync(SNeRGScene.Ship);
     }
     [MenuItem("SNeRG/Asset Downloads/Mic", false, 0)]
     public async static void DownloadMicAssets() {
-        await ImportAssetsAsync(SNeRGScene.Mic);
+        await ImportDemoSceneAsync(SNeRGScene.Mic);
     }
     [MenuItem("SNeRG/Asset Downloads/Ficus", false, 0)]
     public async static void DownloadFicusAssets() {
-        await ImportAssetsAsync(SNeRGScene.Ficus);
+        await ImportDemoSceneAsync(SNeRGScene.Ficus);
     }
     [MenuItem("SNeRG/Asset Downloads/Materials", false, 0)]
     public async static void DownloadMaterialsAssets() {
-        await ImportAssetsAsync(SNeRGScene.Materials);
+        await ImportDemoSceneAsync(SNeRGScene.Materials);
     }
 
     [MenuItem("SNeRG/Asset Downloads/Spheres", false, 50)]
     public async static void DownloadSpheresAssets() {
-        await ImportAssetsAsync(SNeRGScene.Spheres);
+        await ImportDemoSceneAsync(SNeRGScene.Spheres);
     }
     [MenuItem("SNeRG/Asset Downloads/Vase Deck", false, 50)]
     public async static void DownloadVaseDeckAssets() {
-        await ImportAssetsAsync(SNeRGScene.VaseDeck);
+        await ImportDemoSceneAsync(SNeRGScene.VaseDeck);
     }
     [MenuItem("SNeRG/Asset Downloads/Pine Cone", false, 50)]
     public async static void DownloadPineConeAssets() {
-        await ImportAssetsAsync(SNeRGScene.PineCone);
+        await ImportDemoSceneAsync(SNeRGScene.PineCone);
     }
     [MenuItem("SNeRG/Asset Downloads/Toy Car", false, 50)]
     public async static void DownloadToyCarAssets() {
-        await ImportAssetsAsync(SNeRGScene.ToyCar);
+        await ImportDemoSceneAsync(SNeRGScene.ToyCar);
     }
 
     private const string BASE_URL_SYNTH = "https://storage.googleapis.com/snerg/750/";
     private const string BASE_URL_REAL = "https://storage.googleapis.com/snerg/real_1000/";
 
-    private const string BASE_FOLDER = "Assets/SNeRG Data/";
-    private const string BASE_LIB_FOLDER = "Library/Cached SNeRG Data/";
+    private static readonly string BASE_FOLDER = Path.Combine("Assets", "SNeRG Data");
+    private static readonly string BASE_LIB_FOLDER = Path.Combine("Library", "Cached SNeRG Data");
 
-    private static string GetBasePath(SNeRGScene scene) {
-        return $"{BASE_FOLDER}{scene.String()}";
+    private static ImportContext _context;
+
+    private static string GetBasePath(string sceneName) {
+        return Path.Combine(BASE_FOLDER, sceneName);
     }
-
-    private static string GetCacheLocation(SNeRGScene scene) {
-        return $"{BASE_LIB_FOLDER}{scene.String()}";
+    private static string GetCacheLocation(string sceneName) {
+        return Path.Combine(BASE_LIB_FOLDER, sceneName);
     }
-
     private static string GetBaseUrl(SNeRGScene scene) {
         if (scene.IsSynthetic()) {
-            return $"{BASE_URL_SYNTH}{scene.String()}";
+            return $"{BASE_URL_SYNTH}{scene.LowerCaseName()}";
         } else {
-            return $"{BASE_URL_REAL}{scene.String()}";
+            return $"{BASE_URL_REAL}{scene.LowerCaseName()}";
         }
     }
 
-    private static string GetSceneParamsUrl(SNeRGScene scene) {
-        return $"{GetBaseUrl(scene)}/scene_params.json";
+    private static string GetSceneParamsUrl() {
+        return $"{GetBaseUrl(_context.Scene)}/scene_params.json";
     }
-    private static string GetAtlasIndexUrl(SNeRGScene scene) {
-        return $"{GetBaseUrl(scene)}/atlas_indices.png";
+    private static string GetAtlasIndexUrl() {
+        return $"{GetBaseUrl(_context.Scene)}/atlas_indices.png";
     }
-    private static string GetRGBVolumeUrl(SNeRGScene scene, int i) {
-        return $"{GetBaseUrl(scene)}/rgba_{i:D3}.png";
+    private static string GetRGBVolumeUrl(int i) {
+        return $"{GetBaseUrl(_context.Scene)}/rgba_{i:D3}.png";
     }
-    private static string GetFeatureVolumeUrl(SNeRGScene scene, int i) {
-        return $"{GetBaseUrl(scene)}/feature_{i:D3}.png";
+    private static string GetFeatureVolumeUrl(int i) {
+        return $"{GetBaseUrl(_context.Scene)}/feature_{i:D3}.png";
     }
 
-    private static string GetSceneParamsAssetPath(SNeRGScene scene) {
-        string path = $"{GetBasePath(scene)}/SceneParams/{scene.String()}.asset";
-        Directory.CreateDirectory(Path.GetDirectoryName(path));
-        return path;
+    private static string GetSceneParamsAssetPath() {
+        return GetAssetPath("SceneParams", $"{_context.SceneName}.asset");
     }
-    private static string GetRGBTextureAssetPath(SNeRGScene scene) {
-        string path = $"{GetBasePath(scene)}/Textures/{scene.String()} RGB Volume Texture.asset";
-        Directory.CreateDirectory(Path.GetDirectoryName(path));
-        return path;
+    private static string GetRGBTextureAssetPath() {
+        return GetAssetPath("Textures", $"{_context.SceneName} RGB Volume Texture.asset");
     }
-    private static string GetAlphaTextureAssetPath(SNeRGScene scene) {
-        string path = $"{GetBasePath(scene)}/Textures/{scene.String()} Alpha Volume Texture.asset";
-        Directory.CreateDirectory(Path.GetDirectoryName(path));
-        return path;
+    private static string GetAlphaTextureAssetPath() {
+        return GetAssetPath("Textures", $"{_context.SceneName} Alpha Volume Texture.asset");
     }
-    private static string GetFeatureTextureAssetPath(SNeRGScene scene) {
-        string path = $"{GetBasePath(scene)}/Textures/{scene.String()} Feature Volume Texture.asset";
-        Directory.CreateDirectory(Path.GetDirectoryName(path));
-        return path;
+    private static string GetFeatureTextureAssetPath() {
+        return GetAssetPath("Textures", $"{_context.SceneName} Feature Volume Texture.asset");
     }
-    private static string GetAtlasTextureAssetPath(SNeRGScene scene) {
-        string path = $"{GetBasePath(scene)}/Textures/{scene.String()} Atlas Index Texture.asset";
-        Directory.CreateDirectory(Path.GetDirectoryName(path));
-        return path;
+    private static string GetAtlasTextureAssetPath() {
+        return GetAssetPath("Textures", $"{_context.SceneName} Atlas Index Texture.asset");
     }
-    private static string GetShaderAssetPath(SNeRGScene scene) {
-        string path = $"{GetBasePath(scene)}/Shaders/RayMarchShader_{scene}.shader";
-        Directory.CreateDirectory(Path.GetDirectoryName(path));
-        return path;
+    private static string GetShaderAssetPath() {
+        return GetAssetPath("Shaders", $"RayMarchShader_{_context.SceneName}.shader");
     }
-    private static string GetMaterialAssetPath(SNeRGScene scene) {
-        string path = $"{GetBasePath(scene)}/Materials/Material_{scene}.mat";
-        Directory.CreateDirectory(Path.GetDirectoryName(path));
-        return path;
+    private static string GetMaterialAssetPath() {
+        return GetAssetPath("Materials", $"Material_{_context.SceneName}.mat");
     }
-    private static string GetWeightsAssetPath(SNeRGScene scene, int i) {
-        string path = $"{GetBasePath(scene)}/SceneParams/weightsTex{i}.asset";
-        Directory.CreateDirectory(Path.GetDirectoryName(path));
-        return path;
+    private static string GetWeightsAssetPath(int i) {
+        return GetAssetPath("SceneParams", $"weightsTex{i}.asset");
     }
-    private static string GetPrefabAssetPath(SNeRGScene scene) {
-        string path = $"{GetBasePath(scene)}/{scene}.prefab";
-        Directory.CreateDirectory(Path.GetDirectoryName(path));
-        return path;
+    private static string GetPrefabAssetPath() {
+        return GetAssetPath("", $"{_context.SceneName}.prefab");
     }
-    private static string GetMeshAssetPath(SNeRGScene scene) {
-        string path = $"{GetBasePath(scene)}/Volume Mesh/{scene.String()} Volume Mesh.asset";
+    private static string GetMeshAssetPath() {
+        return GetAssetPath("Volume Mesh", $"{_context.SceneName} Volume Mesh.asset");
+    }
+    /// <summary>
+    /// This returns a path in the asset directory to store the specific asset into.
+    /// </summary>
+    private static string GetAssetPath(string subFolder, string assetName) {
+        string path = Path.Combine(GetBasePath(_context.SceneName), subFolder, assetName);
         Directory.CreateDirectory(Path.GetDirectoryName(path));
         return path;
     }
 
-    private static string GetAtlasIndexCachePath(SNeRGScene scene) {
-        string path = $"{GetCacheLocation(scene)}/atlas_indices.png";
-        Directory.CreateDirectory(Path.GetDirectoryName(path));
+    private static string GetAtlasIndexCachePath() {
+        return GetCachePath("atlas_indices.png");
+    }
+    private static string GetRGBVolumeCachePath(int i) {
+        return GetCachePath($"rgba_{i:D3}.png");
+    }
+    private static string GetFeatureVolumeCachePath(int i) {
+        return GetCachePath($"feature_{i:D3}.png");
+    }
+    /// <summary>
+    /// This is either the location where demo scenes are first downloaded to,
+    /// or the path to the source files for custom scene imports.
+    /// </summary>
+    private static string GetCachePath(string assetName) {
+        string path;
+        if (_context.CustomScene) {
+            path = Path.Combine(_context.CustomScenePath, assetName);
+        } else {
+            path = Path.Combine(GetCacheLocation(_context.SceneName), assetName);
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+        }
         return path;
     }
-    private static string GetRGBVolumeCachePath(SNeRGScene scene, int i) {
-        string path = $"{GetCacheLocation(scene)}/rgba_{i:D3}.png";
-        Directory.CreateDirectory(Path.GetDirectoryName(path));
-        return path;
+
+    /// <summary>
+    /// Creates Unity assets for the given SNeRG assets on disk.
+    /// </summary>
+    /// <param name="path">The path to the folder with the SNeRG assets (PNGs & mlp.json)</param>
+    private static async Task ImportCustomScene(string path) {
+        _context = new ImportContext() {
+            CustomScene = true,
+            CustomScenePath = path,
+            Scene = SNeRGScene.Custom
+        };
+        string objName = new DirectoryInfo(path).Name;
+
+        SceneParams sceneParams = CopySceneParamsFromPath(path);
+        if (sceneParams == null) {
+            return;
+        }
+        if (!ValidatePNGs(path, sceneParams)) {
+            return;
+        }
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+
+        await ProcessAssets(objName);
     }
-    private static string GetFeatureVolumeCachePath(SNeRGScene scene, int i) {
-        string path = $"{GetCacheLocation(scene)}/feature_{i:D3}.png";
-        Directory.CreateDirectory(Path.GetDirectoryName(path));
-        return path;
+
+    /// <summary>
+    /// Downloads the source files for the given SNeRG demo scene
+    /// into the <see cref="BASE_LIB_FOLDER"/> folder. Then in the
+    /// Unity project, creates the Unity assets necessary to display it.
+    /// </summary>
+    private static async Task ImportDemoSceneAsync(SNeRGScene scene) {
+        _context = new ImportContext() {
+            CustomScene = false,
+            Scene = scene
+        };
+
+        EditorUtility.DisplayProgressBar(LoadingTitle, $"{DownloadInfo}'{scene.Name()}'...", 0.1f);
+        await DownloadSceneParamsAsync();
+
+        await ProcessAssets(scene.Name());
     }
 
-    private static async Task ImportAssetsAsync(SNeRGScene scene) {
-        string objName = scene.String();
+    /// <summary>
+    /// Set specific import settings on OBJs/PNGs.
+    /// Creates Weight Textures, Materials and Shader from MLP data.
+    /// Creates a convenient prefab for the SNeRG object.
+    /// </summary>
+    private static async Task ProcessAssets(string sceneName) {
+        var sceneParams = GetSceneParams();
 
-        EditorUtility.DisplayProgressBar(LoadingTitle, $"{DownloadInfo}'{objName}'...", 0.1f);
-        var sceneParams = await DownloadSceneParamsAsync(scene);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{sceneName}' Raymarch Shader...", 0.2f);
+        CreateRayMarchShader(sceneParams);
 
-        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Raymarch Shader...", 0.2f);
-        CreateRayMarchShader(scene, sceneParams);
-
-        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Material...", 0.3f);
-        CreateMaterial(scene, sceneParams);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{sceneName}' Material...", 0.3f);
+        CreateMaterial(sceneParams);
 
         // load 3D slices from web or cacbe directory, then create 3D volume textures from that data
-        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Atlas Index Texture...", 0.4f);
-        Texture2D atlasIndexData = await LoadAtlasIndexDataAsync(scene);
-        CreateAtlasIndexTexture(scene, atlasIndexData, sceneParams);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{sceneName}' Atlas Index Texture...", 0.4f);
+        Texture2D atlasIndexData = await LoadAtlasIndexDataAsync();
+        CreateAtlasIndexTexture(atlasIndexData, sceneParams);
 
-        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' RGB Volume Texture...", 0.5f);
-        Texture2D[] rgbImages = await LoadRGBVolumeDataAsync(scene, sceneParams);
-        CreateRgbVolumeTexture(scene, rgbImages, sceneParams);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{sceneName}' RGB Volume Texture...", 0.5f);
+        Texture2D[] rgbImages = await LoadRGBVolumeDataAsync(sceneParams);
+        CreateRgbVolumeTexture(rgbImages, sceneParams);
 
-        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Feature Volume Texture...", 0.6f);
-        Texture2D[] featureImages = await LoadFeatureVolumeDataAsync(scene, sceneParams);
-        CreateFeatureVolumeTexture(scene, featureImages, sceneParams);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{sceneName}' Feature Volume Texture...", 0.6f);
+        Texture2D[] featureImages = await LoadFeatureVolumeDataAsync(sceneParams);
+        CreateFeatureVolumeTexture(featureImages, sceneParams);
 
-        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{scene}' Weight Textures...", 0.7f);
-        CreateWeightTextures(scene, sceneParams);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Creating '{sceneName}' Weight Textures...", 0.7f);
+        CreateWeightTextures(sceneParams);
 
-        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Finishing '{scene}' assets..", 0.8f);
-        VerifyMaterial(scene, sceneParams);
+        EditorUtility.DisplayProgressBar(ProcessingTitle, $"Finishing '{sceneName}' assets..", 0.8f);
+        VerifyMaterial(sceneParams);
 
-        CreatePrefab(scene, sceneParams);
+        CreatePrefab(sceneParams);
 
         EditorUtility.ClearProgressBar();
     }
 
-    private static async Task<SceneParams> DownloadSceneParamsAsync(SNeRGScene scene) {
-        string url = GetSceneParamsUrl(scene);
-        string sceneParamsJson = await WebRequestSimpleAsync.SendWebRequestAsync(url);
-        TextAsset mlpJsonTextAsset = new TextAsset(sceneParamsJson);
-        AssetDatabase.CreateAsset(mlpJsonTextAsset, GetSceneParamsAssetPath(scene));
+    /// <summary>
+    /// Looks for a scene_params.json at <paramref name="path"/> and imports it.
+    /// </summary>
+    private static SceneParams CopySceneParamsFromPath(string path) {
+        string[] sceneParamsPaths = Directory.GetFiles(path, "scene_params.json", SearchOption.AllDirectories);
+        if (sceneParamsPaths.Length > 1) {
+            EditorUtility.DisplayDialog(ImportErrorTitle, "Multiple scene_params.json files found", OK);
+            return null;
+        }
+        if (sceneParamsPaths.Length <= 0) {
+            EditorUtility.DisplayDialog(ImportErrorTitle, "No scene_params.json files found", OK);
+            return null;
+        }
 
+        string sceneParamsJson = File.ReadAllText(sceneParamsPaths[0]);
+        TextAsset sceneParamsTextAsset = new TextAsset(sceneParamsJson);
+        AssetDatabase.CreateAsset(sceneParamsTextAsset, GetSceneParamsAssetPath());
         SceneParams sceneParams = JsonConvert.DeserializeObject<SceneParams>(sceneParamsJson);
         return sceneParams;
     }
 
-    private static async Task<Texture2D> LoadAtlasIndexDataAsync(SNeRGScene scene) {
-        string path = GetAtlasIndexCachePath(scene);
+    private static async Task DownloadSceneParamsAsync() {
+        string url = GetSceneParamsUrl();
+        string sceneParamsJson = await WebRequestSimpleAsync.SendWebRequestAsync(url);
+        TextAsset sceneParamsTextAsset = new TextAsset(sceneParamsJson);
+        AssetDatabase.CreateAsset(sceneParamsTextAsset, GetSceneParamsAssetPath());
+    }
+
+    private static SceneParams GetSceneParams() {
+        string mlpJson = AssetDatabase.LoadAssetAtPath<TextAsset>(GetSceneParamsAssetPath()).text;
+        return JsonConvert.DeserializeObject<SceneParams>(mlpJson);
+    }
+
+    /// <summary>
+    /// Checks if all necessary textures for a given SNeRG scene are present in the given folder.
+    /// </summary>
+    private static bool ValidatePNGs(string path, SceneParams mlp) {
+        string objName = new DirectoryInfo(path).Name;
+        int numSlicePNGs = mlp.NumSlices;
+
+        string[] pngPaths;
+        pngPaths = Directory.GetFiles(path, "feature_*.png", SearchOption.TopDirectoryOnly);
+        if (pngPaths.Length != numSlicePNGs) {
+            EditorUtility.DisplayDialog(ImportErrorTitle, $"Invalid number of feature textures found. Expected: {numSlicePNGs}. Actual: {pngPaths.Length}", OK);
+            return false;
+        }
+        pngPaths = Directory.GetFiles(path, "rgba_*.png", SearchOption.TopDirectoryOnly);
+        if (pngPaths.Length != numSlicePNGs) {
+            EditorUtility.DisplayDialog(ImportErrorTitle, $"Invalid number of feature textures found. Expected: {numSlicePNGs}. Actual: {pngPaths.Length}", OK);
+            return false;
+        }
+
+        string atlasPath = Path.Combine(path, "atlas_indices.png");
+        if (!File.Exists(atlasPath)) {
+            EditorUtility.DisplayDialog(ImportErrorTitle, $"Could not find atlas indices texture.", OK);
+            return false;
+        }
+        return true;
+    }
+
+    private static async Task<Texture2D> LoadAtlasIndexDataAsync() {
+        string path = GetAtlasIndexCachePath();
         byte[] atlasIndexData;
 
         if (File.Exists(path)) {
             // file is already downloaded
             atlasIndexData = File.ReadAllBytes(path);
         } else {
-            string url = GetAtlasIndexUrl(scene);
+            string url = GetAtlasIndexUrl();
             atlasIndexData = await WebRequestBinaryAsync.SendWebRequestAsync(url);
             File.WriteAllBytes(path, atlasIndexData);
         }
@@ -250,17 +364,17 @@ public class SNeRGLoader {
         return atlasIndexImage;
     }
 
-    private static async Task<Texture2D[]> LoadRGBVolumeDataAsync(SNeRGScene scene, SceneParams sceneParams) {
+    private static async Task<Texture2D[]> LoadRGBVolumeDataAsync(SceneParams sceneParams) {
         Texture2D[] rgbVolumeArray = new Texture2D[sceneParams.NumSlices];
         for (int i = 0; i < sceneParams.NumSlices; i++) {
-            string path = GetRGBVolumeCachePath(scene, i);
+            string path = GetRGBVolumeCachePath(i);
             byte[] rgbVolumeData;
 
             if (File.Exists(path)) {
                 // file is already downloaded
                 rgbVolumeData = File.ReadAllBytes(path);
             } else {
-                string url = GetRGBVolumeUrl(scene, i);
+                string url = GetRGBVolumeUrl(i);
                 rgbVolumeData = await WebRequestBinaryAsync.SendWebRequestAsync(url);
                 File.WriteAllBytes(path, rgbVolumeData);
             }
@@ -277,18 +391,18 @@ public class SNeRGLoader {
         return rgbVolumeArray;
     }
 
-    private static async Task<Texture2D[]> LoadFeatureVolumeDataAsync(SNeRGScene scene, SceneParams sceneParams) {
+    private static async Task<Texture2D[]> LoadFeatureVolumeDataAsync(SceneParams sceneParams) {
         Texture2D[] featureVolumeArray = new Texture2D[sceneParams.NumSlices];
 
         for (int i = 0; i < sceneParams.NumSlices; i++) {
-            string path = GetFeatureVolumeCachePath(scene, i);
+            string path = GetFeatureVolumeCachePath(i);
             byte[] featureVolumeData;
 
             if (File.Exists(path)) {
                 // file is already downloaded
                 featureVolumeData = File.ReadAllBytes(path);
             } else {
-                string url = GetFeatureVolumeUrl(scene, i);
+                string url = GetFeatureVolumeUrl(i);
                 featureVolumeData = await WebRequestBinaryAsync.SendWebRequestAsync(url);
                 File.WriteAllBytes(path, featureVolumeData);
             }
@@ -304,9 +418,9 @@ public class SNeRGLoader {
         return featureVolumeArray;
     }
 
-    private static void CreateRgbVolumeTexture(SNeRGScene scene, Texture2D[] rgbaData, SceneParams sceneParams) {
-        string rgbAssetPath = GetRGBTextureAssetPath(scene);
-        string alphaAssetPath = GetAlphaTextureAssetPath(scene);
+    private static void CreateRgbVolumeTexture(Texture2D[] rgbaData, SceneParams sceneParams) {
+        string rgbAssetPath = GetRGBTextureAssetPath();
+        string alphaAssetPath = GetAlphaTextureAssetPath();
         
         // already exists
         if (File.Exists(rgbAssetPath) && File.Exists(alphaAssetPath)) {
@@ -338,7 +452,7 @@ public class SNeRGLoader {
         AssetDatabase.CreateAsset(rgbVolumeTexture, rgbAssetPath);
         AssetDatabase.CreateAsset(alphaVolumeTexture, alphaAssetPath);
 
-        string materialAssetPath = GetMaterialAssetPath(scene);
+        string materialAssetPath = GetMaterialAssetPath();
         Material material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
         material.SetTexture("mapColor", rgbVolumeTexture);
         material.SetTexture("mapAlpha", alphaVolumeTexture);
@@ -346,8 +460,8 @@ public class SNeRGLoader {
         AssetDatabase.SaveAssets();
     }
 
-    private static void CreateFeatureVolumeTexture(SNeRGScene scene, Texture2D[] featureData, SceneParams sceneParams) {
-        string featureAssetPath = GetFeatureTextureAssetPath(scene);
+    private static void CreateFeatureVolumeTexture(Texture2D[] featureData, SceneParams sceneParams) {
+        string featureAssetPath = GetFeatureTextureAssetPath();
 
         // already exists
         if (File.Exists(featureAssetPath)) {
@@ -372,17 +486,17 @@ public class SNeRGLoader {
     
         AssetDatabase.CreateAsset(featureVolumeTexture, featureAssetPath);
 
-        string materialAssetPath = GetMaterialAssetPath(scene);
+        string materialAssetPath = GetMaterialAssetPath();
         Material material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
         material.SetTexture("mapFeatures", featureVolumeTexture);
     }
 
-    private static void CreateAtlasIndexTexture(SNeRGScene scene, Texture2D atlasIndexImage, SceneParams sceneParams) {
+    private static void CreateAtlasIndexTexture(Texture2D atlasIndexImage, SceneParams sceneParams) {
         int width = (int)Mathf.Ceil(sceneParams.GridWidth / (float)sceneParams.BlockSize);
         int height = (int)Mathf.Ceil(sceneParams.GridHeight / (float)sceneParams.BlockSize);
         int depth = (int)Mathf.Ceil(sceneParams.GridDepth / (float)sceneParams.BlockSize);
 
-        string atlasAssetPath = GetAtlasTextureAssetPath(scene);
+        string atlasAssetPath = GetAtlasTextureAssetPath();
 
         // already exists
         if (File.Exists(atlasAssetPath)) {
@@ -395,8 +509,6 @@ public class SNeRGLoader {
             wrapMode = TextureWrapMode.Clamp,
             name = Path.GetFileNameWithoutExtension(atlasAssetPath),
         };
-
-        // load data into a 3D texture,
 
         // load data into 3D textures
         NativeArray<byte> rawAtlasIndexData = atlasIndexImage.GetRawTextureData<byte>();
@@ -416,7 +528,7 @@ public class SNeRGLoader {
 
         AssetDatabase.CreateAsset(atlasIndexTexture, atlasAssetPath);
 
-        string materialAssetPath = GetMaterialAssetPath(scene);
+        string materialAssetPath = GetMaterialAssetPath();
         Material material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
         material.SetTexture("mapIndex", atlasIndexTexture);
     }
@@ -570,7 +682,7 @@ public class SNeRGLoader {
         public byte b;
     }
 
-    private static void CreateRayMarchShader(SNeRGScene scene, SceneParams sceneParams) {
+    private static void CreateRayMarchShader(SceneParams sceneParams) {
         double[][]  Weights_0      = sceneParams._0Weights;
         double[][]  Weights_1      = sceneParams._1Weights;
         double[][]  Weights_2      = sceneParams._2Weights;
@@ -589,7 +701,7 @@ public class SNeRGLoader {
         int posEncScales            = 4;
 
         string shaderSource = RaymarchShader.Template;
-        shaderSource = new Regex("OBJECT_NAME"       ).Replace(shaderSource, $"{scene}");
+        shaderSource = new Regex("OBJECT_NAME"       ).Replace(shaderSource, $"{_context.SceneNameUpperCase}");
         shaderSource = new Regex("NUM_CHANNELS_ZERO" ).Replace(shaderSource, $"{channelsZero}");
         shaderSource = new Regex("NUM_POSENC_SCALES" ).Replace(shaderSource, $"{posEncScales}");
         shaderSource = new Regex("NUM_CHANNELS_ONE"  ).Replace(shaderSource, $"{channelsOne}");
@@ -599,20 +711,20 @@ public class SNeRGLoader {
         shaderSource = new Regex("BIAS_LIST_ONE"     ).Replace(shaderSource, $"{biasListOne}");
         shaderSource = new Regex("BIAS_LIST_TWO"     ).Replace(shaderSource, $"{biasListTwo}");
 
-        string shaderAssetPath = GetShaderAssetPath(scene);
+        string shaderAssetPath = GetShaderAssetPath();
         File.WriteAllText(shaderAssetPath, shaderSource);
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
     }
 
-    private static void CreateMaterial(SNeRGScene scene, SceneParams sceneParams) {
-        string materialAssetPath = GetMaterialAssetPath(scene);
+    private static void CreateMaterial(SceneParams sceneParams) {
+        string materialAssetPath = GetMaterialAssetPath();
         Material material;
 
-        if (File.Exists(GetMaterialAssetPath(scene))) {
+        if (File.Exists(GetMaterialAssetPath())) {
             material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
         } else {
-            string shaderAssetPath = GetShaderAssetPath(scene);
+            string shaderAssetPath = GetShaderAssetPath();
             Shader raymarchShader = AssetDatabase.LoadAssetAtPath<Shader>(shaderAssetPath);
             material = new Material(raymarchShader);
         }
@@ -645,7 +757,7 @@ public class SNeRGLoader {
 
         // volume texture properties will be assigned when creating the 3D textures to avoid having to load them into memory here
 
-        if (!File.Exists(GetMaterialAssetPath(scene))) {
+        if (!File.Exists(GetMaterialAssetPath())) {
             AssetDatabase.CreateAsset(material, materialAssetPath);
         }
         AssetDatabase.SaveAssets();
@@ -655,14 +767,14 @@ public class SNeRGLoader {
     /// <summary>
     /// Assign volume textures again in case material got recreated.
     /// </summary>
-    private static void VerifyMaterial(SNeRGScene scene, SceneParams sceneParams) {
-        string materialAssetPath = GetMaterialAssetPath(scene);
+    private static void VerifyMaterial(SceneParams sceneParams) {
+        string materialAssetPath = GetMaterialAssetPath();
         Material material        = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
                                  
-        string rgbAssetPath      = GetRGBTextureAssetPath(scene);
-        string alphaAssetPath    = GetAlphaTextureAssetPath(scene);
-        string featureAssetPath  = GetFeatureTextureAssetPath(scene);
-        string atlasAssetPath    = GetAtlasTextureAssetPath(scene);
+        string rgbAssetPath      = GetRGBTextureAssetPath();
+        string alphaAssetPath    = GetAlphaTextureAssetPath();
+        string featureAssetPath  = GetFeatureTextureAssetPath();
+        string atlasAssetPath    = GetAtlasTextureAssetPath();
         
         if (material.GetTexture("mapColor") == null) {
             Texture3D rgb = AssetDatabase.LoadAssetAtPath<Texture3D>(rgbAssetPath);
@@ -682,15 +794,15 @@ public class SNeRGLoader {
         }
     }
 
-    private static void CreateWeightTextures(SNeRGScene scene, SceneParams sceneParams) {
+    private static void CreateWeightTextures(SceneParams sceneParams) {
         Texture2D weightsTexZero = createFloatTextureFromData(sceneParams._0Weights);
         Texture2D weightsTexOne = createFloatTextureFromData(sceneParams._1Weights);
         Texture2D weightsTexTwo = createFloatTextureFromData(sceneParams._2Weights);
-        AssetDatabase.CreateAsset(weightsTexZero, GetWeightsAssetPath(scene, 0));
-        AssetDatabase.CreateAsset(weightsTexOne, GetWeightsAssetPath(scene, 1));
-        AssetDatabase.CreateAsset(weightsTexTwo, GetWeightsAssetPath(scene, 2));
+        AssetDatabase.CreateAsset(weightsTexZero, GetWeightsAssetPath(0));
+        AssetDatabase.CreateAsset(weightsTexOne, GetWeightsAssetPath(1));
+        AssetDatabase.CreateAsset(weightsTexTwo, GetWeightsAssetPath(2));
 
-        string materialAssetPath = GetMaterialAssetPath(scene);
+        string materialAssetPath = GetMaterialAssetPath();
         Material material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
         material.SetTexture("weightsZero", weightsTexZero);
         material.SetTexture("weightsOne", weightsTexOne);
@@ -744,23 +856,29 @@ public class SNeRGLoader {
     /// <summary>
     /// Creates a convenient prefab for the SNeRG.
     /// </summary>
-    private static void CreatePrefab(SNeRGScene scene, SceneParams sceneParams) {
+    private static void CreatePrefab(SceneParams sceneParams) {
         GameObject prefabObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        prefabObject.name = scene.ToString();
+        prefabObject.name = _context.SceneName;
         MeshRenderer renderer = prefabObject.GetComponent<MeshRenderer>();
-        string materialAssetPath = GetMaterialAssetPath(scene);
+        string materialAssetPath = GetMaterialAssetPath();
         Material material = AssetDatabase.LoadAssetAtPath<Material>(materialAssetPath);
         renderer.material = material;
-        // create mesh copy and scale by volume extents to be able to raymarchin object space
         MeshFilter meshFilter = prefabObject.GetComponent<MeshFilter>();
         meshFilter.sharedMesh = CreateMesh(meshFilter.sharedMesh, sceneParams);
-        meshFilter.sharedMesh.name = $"{scene}_volume_mesh";
-        AssetDatabase.CreateAsset(meshFilter.sharedMesh, GetMeshAssetPath(scene));
+        meshFilter.sharedMesh.name = $"{_context.SceneName}_volume_mesh";
+        AssetDatabase.CreateAsset(meshFilter.sharedMesh, GetMeshAssetPath());
         prefabObject.AddComponent<EnableDepthTexture>();
-        PrefabUtility.SaveAsPrefabAsset(prefabObject, GetPrefabAssetPath(scene));
+        PrefabUtility.SaveAsPrefabAsset(prefabObject, GetPrefabAssetPath());
         GameObject.DestroyImmediate(prefabObject);
     }
 
+    /// <summary>
+    /// Creates a copy of the default cube mesh
+    /// and scales by volume extents to be able to raymarch in object space.
+    /// </summary>
+    /// <param name="mesh"></param>
+    /// <param name="sceneParams"></param>
+    /// <returns></returns>
     private static Mesh CreateMesh(Mesh mesh, SceneParams sceneParams) {
         var vertices = mesh.vertices;
         for(int i = 0; i < vertices.Length; i++) {
@@ -782,52 +900,5 @@ public class SNeRGLoader {
             tangents  = mesh.tangents
         };
         return newMesh;
-    }
-}
-
-public enum SNeRGScene {
-    Lego,
-    Chair,
-    Drums,
-    Hotdog,
-    Ship,
-    Mic,
-    Ficus,
-    Materials,
-    Spheres,
-    VaseDeck,
-    PineCone,
-    ToyCar
-}
-
-public static class SNeRGSceneExtensions {
-
-    public static string String(this SNeRGScene scene) {
-        return scene.ToString().ToLower();
-    }
-
-    public static SNeRGScene ToEnum(string value) {
-        return (SNeRGScene)Enum.Parse(typeof(SNeRGScene), value, true);
-    }
-
-    public static bool IsSynthetic(this SNeRGScene scene) {
-        switch (scene) {
-            case SNeRGScene.Lego:
-            case SNeRGScene.Chair:
-            case SNeRGScene.Drums:
-            case SNeRGScene.Hotdog:
-            case SNeRGScene.Ship:
-            case SNeRGScene.Mic:
-            case SNeRGScene.Ficus:
-            case SNeRGScene.Materials:
-                return true;
-            case SNeRGScene.Spheres:
-            case SNeRGScene.VaseDeck:
-            case SNeRGScene.PineCone:
-            case SNeRGScene.ToyCar:
-                return false;
-            default:
-                throw new InvalidOperationException();
-        }
     }
 }
