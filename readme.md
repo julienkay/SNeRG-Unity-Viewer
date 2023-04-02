@@ -20,6 +20,17 @@ In each scene folder, there will be a convenient prefab, that you can then drag 
 Since the initial release a number of issues have been fixed in the asset generation code.
 That means, that if you have already imported some scenes before, you'll have to delete these source files and regenerate them by going to *SNeRG -> Asset Downloads* again.
 
+## Importing self-trained scenes
+
+If you have successfully trained your own SNeRG scenes using the [official code release](https://github.com/google-research/google-research/tree/master/snerg) and want to render them in Unity, you can use the menu *SNeRG -> Import from disk*.
+This lets you choose a folder that must contain the output files of your training process.
+
+More specifically, the following assets are required:
+- a file named 'scene_params.json'
+- a PNG file for the 3D atlas texture: atlas_indices.png
+- several PNG files for the 3D feature texture: feature_XXX.png - feature_YYY.png
+- several PNG files for the 3D RGB and alpha texture: rgba_XXX.png - rgba_YYY.png
+
 ## Details
 
 This project was created with Unity 2021.3 LTS using the Built-in Render Pipeline.
