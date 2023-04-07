@@ -86,10 +86,3 @@ crashlytics-build.properties
 .Trashes
 ehthumbs.db
 Thumbs.db
-
-
-# ====== #
-# custom #
-# ====== #
-/[Aa]ssets/[Ss]NeRG Data/
-/[Aa]ssets/[Ss]NeRG Data.meta

@@ -1,0 +1,16 @@
+{
+   "name": "com.doji.snerg",
+   "version": "1.0.0",
+   "displayName": "SNeRG",
+   "description": "An unofficial Unity port of the SNeRG viewer.",
+   "dependencies":
+   {
+      "com.unity.nuget.newtonsoft-json": "3.0.2"
+   },
+   "author":
+   {
+      "name": "Doji Technologies",
+      "email": "support@doji-tech.com",
+      "url": "https://www.doji-tech.com/"
+   }
+}
