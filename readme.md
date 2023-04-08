@@ -10,17 +10,43 @@ This repository contains the source code for a Unity port of the web viewer for 
 
 I recommend 32GB of RAM and a graphics card with 4GB of VRAM.
 
-## Setup
+## Usage
 
-After cloning the project you can simply use the menu *SNeRG -> Asset Downloads* to download any of the sample scenes available.
-In each scene folder, there will be a convenient prefab, that you can then drag into the scene and you're good to go.
+### Installation
 
-## Updating
+Go to the [releases section](https://github.com/julienkay/SNeRG-Unity-Viewer/releases/latest), download the Unity Package, and import it into any Unity project. This is a 'Hybrid Package' that will install into your project as a local package.
+
+##### Alternatives
+
+<details>
+  <summary> UPM Package via OpenUPM </summary>
+  
+  In `Edit -> Project Settings -> Package Manager`, add a new scoped registry:
+
+    Name: Doji
+    URL: https://package.openupm.com
+    Scope(s): com.doji
+ 
+  In the Package Manager install 'com.doji.snerg' either by name or via `Package Manager -> My Registries`
+</details>
+
+<details>
+  <summary> UPM Package via Git URL </summary>
+  
+  In `Package Manager -> Add package from git URL...` paste `https://github.com/julienkay/SNeRG-Unity-Viewer.git` [as described here](https://docs.unity3d.com/Manual/upm-ui-giturl)
+</details>
+
+### Importing sample scenes
+
+After succesful installation, you can use the menu *SNeRG -> Asset Downloads* to download any of the sample scenes available.
+In each scene folder there will be a convenient prefab, that you can then drag into the scene and you're good to go.
+
+### Updating
 
 Since the initial release a number of issues have been fixed in the asset generation code.
 That means, that if you have already imported some scenes before, you'll have to delete these source files and regenerate them by going to *SNeRG -> Asset Downloads* again.
 
-## Importing self-trained scenes
+### Importing self-trained scenes
 
 If you have successfully trained your own SNeRG scenes using the [official code release](https://github.com/google-research/google-research/tree/master/snerg) and want to render them in Unity, you can use the menu *SNeRG -> Import from disk*.
 This lets you choose a folder that must contain the output files of your training process.
@@ -45,6 +71,6 @@ Deviations from the official viewer:
 A possible solution to this might be to defer the 3D texture creation and import the volumes into Unity as individual 2D slices, (similar to how the official web viewer distributes the data) and only assemble the 3D textures at runtime. For development, it was quite useful to preview the volume without having to enter Play Mode though. But some scenes are currently just very difficult to handle, even when your GPU could fit the data into VRAM just fine.  
 This is all assuming you have set the Asset Serialization Mode to 'Force Binary', which I have done for this project. Text serialization would otherwise be close to unusable. Unfortunately, the Asset Serialization Mode seems to be a project-wide setting, which is a bit inconvenient for use in real-world projects I imagine.  
 I should have probably looked more into texture compression options, but the little information I found on compression support on various platforms for 3D textures specifically didn't instill much confidence..  
-Fortunately, [MERF](https://merf42.github.io/) reduces these requirements by quite a bit.
+For future improvements, [MERF](https://merf42.github.io/) looks promising in terms of reducing memory usage.
 
 [^1]: [Peter Hedman and Pratul P. Srinivasan and Ben Mildenhall and Jonathan T. Barron and Paul Debevec. Baking Neural Radiance Fields for Real-Time View Synthesis. ICCV, 2021](https://phog.github.io/snerg/)
