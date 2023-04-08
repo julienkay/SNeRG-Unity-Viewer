@@ -41,9 +41,9 @@ namespace SNeRG.Editor {
                 int displayMode;
                 int ndc;
 
-                float4 minPosition;
-                float4 gridSize;
-                float4 atlasSize;
+                float3 minPosition;
+                float3 gridSize;
+                float3 atlasSize;
                 float voxelSize;
                 float blockSize;
                 int maxStep;
@@ -93,7 +93,7 @@ namespace SNeRG.Editor {
                     return o;
                 }
 
-                half indexToPosEnc (half3 dir, int index) {
+                half indexToPosEnc (half3 dir, uint index) {
                     half coordinate =
                         (index % 3 == 0) ? dir.x : (
                             (index % 3 == 1) ? dir.y : dir.z);
@@ -111,8 +111,8 @@ namespace SNeRG.Editor {
             
                 half3 evaluateNetwork(fixed3 color, fixed4 features, fixed3 viewdir) {
                     half intermediate_one[NUM_CHANNELS_ONE] = { BIAS_LIST_ZERO };
-                    int i = 0;
-                    int j = 0;
+                    uint i = 0;
+                    uint j = 0;
 
                     for (j = 0; j < NUM_CHANNELS_ZERO; ++j) {
                         half input_value = 0.0;
@@ -217,16 +217,16 @@ namespace SNeRG.Editor {
 
                 // Compute the atlas block index for a point in the scene using pancake
                 // 3D atlas packing.
-                half3 pancakeBlockIndex(half3 posGrid, float blockSize, int3 iBlockGridBlocks) {
-                    int3 iBlockIndex = int3(floor(posGrid / blockSize));
-                    int3 iAtlasBlocks = atlasSize.xyz / (blockSize + 2.0);
-                    int linearIndex = iBlockIndex.x + iBlockGridBlocks.x *
+                half3 pancakeBlockIndex(half3 posGrid, float blockSize, float3 iBlockGridBlocks) {
+                    float3 iBlockIndex = floor(posGrid / blockSize);
+                    float3 iAtlasBlocks = atlasSize / (blockSize + 2.0);
+                    float linearIndex = iBlockIndex.x + iBlockGridBlocks.x *
                         (iBlockIndex.z + iBlockGridBlocks.z * iBlockIndex.y);
 
                     half3 atlasBlockIndex = half3(
-                        float(linearIndex % iAtlasBlocks.x),
-                        float((linearIndex / iAtlasBlocks.x) % iAtlasBlocks.y),
-                        float(linearIndex / (iAtlasBlocks.x * iAtlasBlocks.y)));
+                        linearIndex % iAtlasBlocks.x,
+                        (linearIndex / iAtlasBlocks.x) % iAtlasBlocks.y,
+                        linearIndex / (iAtlasBlocks.x * iAtlasBlocks.y));
 
                     // If we exceed the size of the atlas, indicate an empty voxel block.
                     if (atlasBlockIndex.z >= float(iAtlasBlocks.z)) {
@@ -271,16 +271,13 @@ namespace SNeRG.Editor {
                     }
 
                     // Now transform them to the voxel grid coordinate system.
-                    half3 originGrid = (origin - minPosition.xyz) / voxelSize;
+                    half3 originGrid = (origin - minPosition) / voxelSize;
                     half3 directionGrid = directionWorld;
                     half3 invDirectionGrid = 1.0 / directionGrid;
 
-                    int3 iGridSize = int3(round(gridSize.xyz));
-                    int iBlockSize = int(round(blockSize));
-                    int3 iBlockGridBlocks = (iGridSize + iBlockSize - 1) / iBlockSize;
-                    int3 iBlockGridSize = iBlockGridBlocks * iBlockSize;
-                    half3 blockGridSize = half3(iBlockGridSize);
-                    half2 tMinMax = rayAabbIntersection(half3(0.0, 0.0, 0.0), gridSize.xyz, originGrid, invDirectionGrid);
+                    float iBlockGridBlocks = floor((gridSize + blockSize - 1) / blockSize);
+                    float3 blockGridSize = iBlockGridBlocks * blockSize;
+                    half2 tMinMax = rayAabbIntersection(half3(0.0, 0.0, 0.0), gridSize, originGrid, invDirectionGrid);
 
                     // Skip any rays that miss the scene bounding box.
                     if (tMinMax.x > tMinMax.y) {
@@ -297,9 +294,9 @@ namespace SNeRG.Editor {
                     half3 atlasBlockIndex;
 
                     if (displayMode == DISPLAY_3D_ATLAS) {
-                      atlasBlockIndex = pancakeBlockIndex(posGrid, blockSize, iBlockGridBlocks);
+                        atlasBlockIndex = pancakeBlockIndex(posGrid, blockSize, iBlockGridBlocks);
                     } else {
-                      atlasBlockIndex = 255.0 * UNITY_SAMPLE_TEX3D(mapIndex, (blockMin + blockMax) / (2.0 * blockGridSize)).xyz;
+                        atlasBlockIndex = 255.0 * UNITY_SAMPLE_TEX3D(mapIndex, (blockMin + blockMax) / (2.0 * blockGridSize)).xyz;
                     }
 
                     half visibility = 1.0;
@@ -315,7 +312,7 @@ namespace SNeRG.Editor {
                     float3 viewPlane = (i.camRelativeWorldPos) / dot((i.camRelativeWorldPos), mul(float3(0.0,0.0,-1.0), UNITY_MATRIX_V));
                     float3 sceneDepthWorld = viewPlane * linearDepth + _WorldSpaceCameraPos;
                     float3 sceneDepthObj = mul(unity_WorldToObject, float4(sceneDepthWorld, 1.0));
-                    float3 sceneDepthGrid = ((sceneDepthObj -  minPosition.xyz) / voxelSize) + 0.5;
+                    float3 sceneDepthGrid = ((sceneDepthObj -  minPosition) / voxelSize) + 0.5;
                 
                     // maximum ray distance to march in voxel grid space
                     float maxDist = distance(sceneDepthGrid, originGrid);
@@ -332,8 +329,8 @@ namespace SNeRG.Editor {
                             posAtlas += 1.0; // Account for the one voxel padding in the atlas.
 
                             if (displayMode == DISPLAY_COARSE_GRID) {
-                                color = atlasBlockIndex * (blockSize + 2.0) / atlasSize.xyz;
-                                features.rgb = atlasBlockIndex * (blockSize + 2.0) / atlasSize.xyz;
+                                color = atlasBlockIndex * (blockSize + 2.0) / atlasSize;
+                                features.rgb = atlasBlockIndex * (blockSize + 2.0) / atlasSize;
                                 features.a = 1.0;
                                 visibility = 0.0;
                                 continue;
@@ -354,7 +351,7 @@ namespace SNeRG.Editor {
 
                             if (atlasAlpha > 0.0) {
                                 // OK, we hit something, do a proper trilinear fetch at high res.
-                                half3 atlasUvw = posAtlas / atlasSize.xyz;
+                                half3 atlasUvw = posAtlas / atlasSize;
                                 atlasAlpha = UNITY_SAMPLE_TEX3D_LOD(mapAlpha, atlasUvw, 0.0).x;
 
                                 // Only worth fetching the content if high res alpha is non-zero.
@@ -388,9 +385,9 @@ namespace SNeRG.Editor {
                     }
 
                     if (displayMode == DISPLAY_VIEW_DEPENDENT) {
-                      color = half3(0.0, 0.0, 0.0) * visibility;
+                        color = half3(0.0, 0.0, 0.0) * visibility;
                     } else if (displayMode == DISPLAY_FEATURES) {
-                      color = features.rgb;
+                        color = features.rgb;
                     }
 
                     // For forward-facing scenes, we partially unpremultiply alpha to fill

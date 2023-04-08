@@ -737,20 +737,20 @@ namespace SNeRG.Editor {
             material.SetVector("minPosition", new Vector4(
                 (float)sceneParams.MinX,
                 (float)sceneParams.MinY,
-                (float)sceneParams.MinZ,
-                0f)
+                (float)sceneParams.MinZ
+                )
             );
             material.SetVector("gridSize", new Vector4(
                 sceneParams.GridWidth,
                 sceneParams.GridHeight,
-                sceneParams.GridDepth,
-                0)
+                sceneParams.GridDepth
+                )
             );
             material.SetVector("atlasSize", new Vector4(
                 sceneParams.AtlasWidth,
                 sceneParams.AtlasHeight,
-                sceneParams.AtlasDepth,
-                0)
+                sceneParams.AtlasDepth
+                )
             );
             material.SetFloat("voxelSize", (float)sceneParams.VoxelSize);
             material.SetFloat("blockSize", (float)sceneParams.BlockSize);
