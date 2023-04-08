@@ -23,7 +23,7 @@ namespace SNeRG.Editor {
             maxStep (""Max Step"", Integer) = 0.0
         }
         SubShader {
-            Tags { ""Queue"" = ""Geometry+1"" }
+            Tags { ""Queue"" = ""Transparent"" }
         
             Cull Front
             ZWrite Off
