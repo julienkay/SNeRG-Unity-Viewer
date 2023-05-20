@@ -884,13 +884,21 @@ namespace SNeRG.Editor {
         private static Mesh CreateMesh(Mesh mesh, SceneParams sceneParams) {
             var vertices = mesh.vertices;
             for (int i = 0; i < vertices.Length; i++) {
+
                 Vector3 v = vertices[i];
-                v.Scale(new Vector3(
-                    Mathf.Abs((float)sceneParams.MinX),
-                    Mathf.Abs((float)sceneParams.MinY),
-                    Mathf.Abs((float)sceneParams.MinZ))
-                    * 2f
-                );
+                Vector3 size = new Vector3(
+                    Mathf.Abs((float)sceneParams.GridWidth),
+                    Mathf.Abs((float)sceneParams.GridHeight),
+                    Mathf.Abs((float)sceneParams.GridDepth))
+                    * (float)sceneParams.VoxelSize;
+                Vector3 minPos = new Vector3(
+                    (float)sceneParams.MinX,
+                    (float)sceneParams.MinY,
+                    (float)sceneParams.MinZ
+                    );
+                Vector3 offset = minPos + size / 2;
+                v.Scale(size);
+                v += offset;                
                 vertices[i] = v;
             }
             Mesh newMesh = new Mesh {
