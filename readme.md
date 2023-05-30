@@ -67,10 +67,20 @@ Deviations from the official viewer:
 
 ## Known Issues
 
-- Memory requirements for working with 3D textures in Unity are quite high. The way the import process works right now is that Texture3D assets are created in-Editor. The memory that Unity uses when serializing these as assets on disk is a bit too high for my liking. Granted, the size of these scenes can go up to Gigabytes. However, I've found that 16GB of RAM was often not enough to handle the import/creation of 2GB of uncompressed 3D textures due to inefficiencies. I wasn’t even able to import some of the larger scenes until upgrading to 32GB RAM.  
-A possible solution to this might be to defer the 3D texture creation and import the volumes into Unity as individual 2D slices, (similar to how the official web viewer distributes the data) and only assemble the 3D textures at runtime. For development, it was quite useful to preview the volume without having to enter Play Mode though. But some scenes are currently just very difficult to handle, even when your GPU could fit the data into VRAM just fine.  
-This is all assuming you have set the Asset Serialization Mode to 'Force Binary', which I have done for this project. Text serialization would otherwise be close to unusable. Unfortunately, the Asset Serialization Mode seems to be a project-wide setting, which is a bit inconvenient for use in real-world projects I imagine.  
-I should have probably looked more into texture compression options, but the little information I found on compression support on various platforms for 3D textures specifically didn't instill much confidence..  
+- Memory requirements for working with 3D textures in Unity are quite high. The way the import process works right now is that Texture3D assets are created in-Editor. The memory that Unity uses when serializing these as assets on disk is a bit too high for my liking. Granted, the size of these scenes can go up to Gigabytes. However, I've found that 16GB of RAM was often not enough to handle the import/creation of 2GB of uncompressed 3D textures due to inefficiencies. I wasn’t even able to import some of the larger scenes until upgrading to 32GB RAM.
+
+- Unity straight-up errors out when trying to create 3D textures with sizes of 2GB or larger. Some of the feature volumes like the ficus scene (2048x2048x128) hit that limit and can not be imported.
+
+### Possible Workarounds
+
+- One possible solution to handling the data in-Editor might be to defer the 3D texture creation and import the volumes into Unity as individual 2D slices, (similar to how the official web viewer distributes the data) and only assemble the 3D textures at runtime. For development, it was quite useful to preview the volume without having to enter Play Mode though. But some scenes are currently just very difficult to handle, even when your GPU could fit the data into VRAM just fine.
+
+- I should have probably looked more into texture compression options for 3D textures 
+
+- I've set the Asset Serialization Mode to 'Force Binary' with some success of reducing memory consumption during import. Unfortunately, the Asset Serialization Mode is a project-wide setting, which is a bit inconvenient, because in real-world projects text serialization is more commonly used I suppose.
+
 For future improvements, [MERF](https://merf42.github.io/) looks promising in terms of reducing memory usage.
+
+## Acknowledgements
 
 [^1]: [Peter Hedman and Pratul P. Srinivasan and Ben Mildenhall and Jonathan T. Barron and Paul Debevec. Baking Neural Radiance Fields for Real-Time View Synthesis. ICCV, 2021](https://phog.github.io/snerg/)
