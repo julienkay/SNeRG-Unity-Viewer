@@ -275,7 +275,7 @@ namespace SNeRG.Editor {
                     half3 directionGrid = directionWorld;
                     half3 invDirectionGrid = 1.0 / directionGrid;
 
-                    float iBlockGridBlocks = floor((gridSize + blockSize - 1) / blockSize);
+                    float3 iBlockGridBlocks = floor((gridSize + blockSize - 1) / blockSize);
                     float3 blockGridSize = iBlockGridBlocks * blockSize;
                     half2 tMinMax = rayAabbIntersection(half3(0.0, 0.0, 0.0), gridSize, originGrid, invDirectionGrid);
 
