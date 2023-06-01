@@ -277,6 +277,7 @@ namespace SNeRG.Editor {
 
                     float3 iBlockGridBlocks = floor((gridSize + blockSize - 1) / blockSize);
                     float3 blockGridSize = iBlockGridBlocks * blockSize;
+                    
                     half2 tMinMax = rayAabbIntersection(half3(0.0, 0.0, 0.0), gridSize, originGrid, invDirectionGrid);
 
                     // Skip any rays that miss the scene bounding box.
