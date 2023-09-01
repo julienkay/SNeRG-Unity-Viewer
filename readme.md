@@ -81,6 +81,10 @@ Deviations from the official viewer:
 
 For future improvements, [MERF](https://merf42.github.io/) looks promising in terms of reducing memory usage.
 
-## Acknowledgements
+## References
+
+Other projects exploring NeRFs and related techniques in Unity:
+- [MobileNeRF (Exploiting the Polygon Rasterization Pipeline for Efficient Neural Field Rendering on Mobile Architectures)](https://github.com/julienkay/SNeRG-Unity-Viewer)
+- [MERF (Memory Efficient Radiance Fields)](https://github.com/julienkay/MERF-Unity-Viewer)
 
 [^1]: [Peter Hedman and Pratul P. Srinivasan and Ben Mildenhall and Jonathan T. Barron and Paul Debevec. Baking Neural Radiance Fields for Real-Time View Synthesis. ICCV, 2021](https://phog.github.io/snerg/)
